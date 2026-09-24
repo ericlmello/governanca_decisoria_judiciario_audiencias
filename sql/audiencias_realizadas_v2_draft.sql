@@ -149,8 +149,10 @@ proxima_audiencia AS (
 -- pje.tb_calendario_eventos. Regra definida pelo usuário: dia útil = não suspende
 -- audiência E não suspende prazo. Abrangência: nacional (id_orgao_julgador/id_estado
 -- IS NULL) ou estado de SP (id_estado = 26).
--- TODO(confirmar): id_municipio não está sendo considerado (usuário só mencionou estado);
--- se houver feriado municipal relevante para alguma vara, precisa entrar aqui também.
+-- TODO(decisão SETIC): id_municipio não está sendo considerado (regra hoje só cobre nacional
+-- + estado de SP). Se um registro do calendário suspender audiência/prazo só num município
+-- específico (não no estado inteiro), esse dia deve contar como não-útil apenas para as varas
+-- daquele município, ou nacional+estadual já é suficiente?
 calendario_3du AS (
     SELECT
         r.id_processo_audiencia,

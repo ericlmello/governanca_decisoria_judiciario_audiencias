@@ -136,8 +136,10 @@ O usuário indicou duas tabelas que resolvem parte das divergências 4 e 5 da se
   precisam estar livres). Implementado na CTE `calendario_3du` com
   `(ce.in_suspende_prazo = 'S' OR ce.in_suspende_audiencia = 'S')` dentro do `NOT EXISTS`.
 - Abrangência: nacional (`id_orgao_julgador IS NULL`/`id_estado IS NULL`) **ou** estado de São
-  Paulo (`id_estado = 26`). `id_municipio` segue sem tratamento — se algum feriado municipal for
-  relevante para alguma vara específica, precisa ser adicionado depois.
+  Paulo (`id_estado = 26`). `id_municipio` segue sem tratamento — **dúvida de negócio em aberto,
+  levada ao chamado da SETIC**: se um registro do calendário suspender audiência/prazo só num
+  município específico (não no estado inteiro), esse dia deve contar como não-útil apenas para
+  as varas daquele município, ou nacional+estadual já é suficiente?
 
 Ainda **não confirmado**:
 
@@ -290,6 +292,8 @@ ORDER BY dt_ano;
    por ano.
 7. Decidir se a janela de 3 dias úteis se aplica à marcação da perícia (`pp.dt_marcacao`) (ver
    seção 3.3; a referência de prazo válido já foi decidida: `CURRENT_DATE - 1 dia`).
+7.1 Confirmar com a SETIC a abrangência municipal (`id_municipio`) da regra de dia útil — hoje
+   só cobre nacional + estado de SP (ver seção 3.1).
 8. Rodar a query 4.2.2 para checar se existe uma tabela de complemento estruturada para "tipo de
    documento" expedido (alternativa mais robusta ao `ILIKE` em `ds_texto_final_externo` usado
    hoje para diferenciar ofício/carta precatória/mandado, todos sob o código `60`).
