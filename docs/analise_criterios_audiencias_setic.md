@@ -26,17 +26,20 @@ documento:
 | Encerramento de Instrução | 10, 25 (videoconf) |
 | Julgamento | 4 (confirma o que a query original já assumia) |
 
-**Ambíguos/fora do documento — decisão do usuário pendente:**
+**Decidido pelo usuário:** tipos totalmente fora do documento (Conciliação em Conhecimento
+(1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
+juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública (17, 30))
+**ficam de fora** da população avaliada. Já implementado assim.
 
-- `8` Instrução e Julgamento — variante de Instrução, ou regra própria (sempre Efetiva, já que
-  não depende de sinal posterior)?
-- `7` UNA-RS ou Justificação Prévia / `9` Una - RS — o que significa "RS"? Variante de UNA ou
-  outra coisa?
-- Totalmente fora do documento (não aparecem em nenhuma seção da árvore de decisão):
-  Conciliação em Conhecimento (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37),
-  Inquirição de testemunha — juízo deprecado (11, 26), Justificação Prévia (18), Mediação
-  (13, 14, 15, 28), Pública (17, 30). Ficam fora da população avaliada em
-  `sql/audiencias_realizadas_v2_draft.sql` até o usuário decidir se entram e com qual regra.
+**Ainda pendentes:**
+
+- `8` Instrução e Julgamento — segue a árvore da Instrução (seção 2.4 — diligência+Encerramento
+  de Instrução → Efetiva; sem diligência+Julgamento → Efetiva; regra geral de mesma categoria
+  se redesignada; caso contrário Adiada por omissão), ou tem regra própria?
+- `7` UNA-RS ou Justificação Prévia / `9` Una - RS — hipótese levantada (não confirmada): "RS"
+  pode ser "Rito Sumário", o terceiro rito trabalhista (CLT/Lei 5.584/70), distinto do
+  sumaríssimo (Lei 9.957/2000, já mapeado acima em UNA). Se confirmado, esses ids entrariam no
+  grupo UNA. Ainda não aplicado no rascunho — aguardando confirmação.
 
 ## 1. Resumo da lógica atual (query original)
 
@@ -236,10 +239,15 @@ mais `ILIKE` no catálogo:
 **Achado extra, sobre a query ORIGINAL (não o rascunho):** os ids `941` e `371`, usados nela
 como sinal adicional de "Efetiva" (`OR e.id_evento IN (941, 371)`), correspondem — pela mesma
 amostra — a `941 = "Declarada a incompetência"` e `371 = "Acolhida a exceção de incompetência"`.
-Não têm relação direta com sentença/julgamento. Pode ser intencional (processo resolvido/
-remetido por incompetência também conta como audiência que cumpriu seu papel), mas **vale
-confirmar com a SETIC** antes de decidir se esse sinal é replicado na v2 — por ora, o rascunho
-não o inclui.
+Não têm relação direta com sentença/julgamento.
+
+**Decidido pelo usuário: "mantém".** Reproduzido na v2 com prioridade máxima no `CASE` de
+classificação (CTE `incompetencia_na_janela`), igual à query original — se um desses dois
+eventos ocorre dentro da janela, a audiência é Efetiva independentemente de qualquer outra
+condição (inclusive redesignação de mesma categoria), reproduzindo o comportamento original em
+que esse sinal vivia dentro do mesmo bloco que decidia Adiada. Ajuste assumido (não pedido
+explicitamente): usa a janela de 3 dias úteis da v2, não os 5 dias corridos da query original —
+sinalizar se isso não for o esperado.
 
 **Confirmação cruzada via `pje.tb_evento` (id_evento, ds_evento — rótulo curto/categoria, o
 usuário devolveu essa tabela também):** bate com tudo acima —
@@ -328,18 +336,22 @@ ORDER BY dt_ano;
    seção 3.4: (a) "mesma categoria" comparava id exato em vez de grupo; (b) "Encerramento de
    Instrução designado" nunca era exigido junto com a diligência; (c) "marcação de audiência de
    julgamento" só olhava a audiência imediatamente seguinte. Todos corrigidos no rascunho v2.
+3.3 ~~Tipos fora do documento~~ — decidido: ficam de fora da população avaliada (seção 0), já
+   implementado.
+3.4 ~~ids `941`/`371` da query original~~ — decidido: "mantém". Reproduzido na v2 com prioridade
+   máxima (CTE `incompetencia_na_janela`), ver seção 3.2.
+3.5 ~~Janela de 3 dias úteis aplicada só onde o documento determina~~ — decidido: Regra Geral e
+   Inicial não têm janela; já implementado assim (nenhuma mudança necessária).
 
 **Ainda pendente:**
-4. Decidir os itens ambíguos/fora do documento (seção 0): tipo `8` "Instrução e Julgamento";
-   tipos `7`/`9` "...RS"; e o bloco Conciliação/Mediação/Pública/Inquirição/Justificação Prévia
-   — hoje fora da população avaliada. (O documento reforça essa restrição de escopo na seção 2.1
-   — ver nota nessa seção.)
-4.1 Duas lacunas do próprio documento, achadas na mesma releitura (seção 3.4, itens d/e): o que
+4. `8` "Instrução e Julgamento" — segue a árvore da Instrução (detalhada na conversa) ou tem
+   regra própria?
+4.1 `7`/`9` "...RS" — hipótese levantada (Rito Sumário, ver seção 0) ainda não confirmada nem
+   aplicada no rascunho.
+4.2 Duas lacunas do próprio documento, achadas na releitura (seção 3.4, itens d/e): o que
    acontece com UNA seguida de um tipo que não é UNA nem Instrução; e qual o status da Instrução
    quando nem diligência+Encerramento nem sem-diligência+Julgamento se aplicam.
-5. Confirmar com a SETIC se os ids `941`/`371` da query **original** (achado da seção 3.2) devem
-   ser replicados na v2 como sinal de efetividade.
-5.1 Confirmar com a SETIC se "Prolação de sentença" deve incluir sentença terminativa (extinção
+5. Confirmar com a SETIC se "Prolação de sentença" deve incluir sentença terminativa (extinção
    sem resolução do mérito — códigos 456/458/459/461/463/464/465/454/50126), hoje comentados
    em `movimentos_julgamento` no rascunho (ver seção 3.2).
 6. Rodar a query 4.5 para validar a regra de dia útil contra a contagem real de dias não-úteis

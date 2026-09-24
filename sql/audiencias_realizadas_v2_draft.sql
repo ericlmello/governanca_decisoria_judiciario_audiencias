@@ -7,6 +7,9 @@
  * para o comparativo completo com a query original (sql/audiencias_realizadas_original.sql).
  *
  * Regras implementadas (ver seção 2 do doc de análise):
+ *   0. Sinal legado (incompetência declarada/exceção de incompetência acolhida) -> EFETIVA,
+ *      com prioridade sobre todas as outras regras. Não está no documento novo; mantido da
+ *      query original por decisão do usuário (ver ATENÇÃO abaixo).
  *   1. Regra geral: redesignação de audiência da MESMA categoria (agrupando variantes
  *      sumaríssimo/videoconferência) -> ADIADA.
  *   2. Inicial: qualquer audiência subsequente (UNA/Instrução/Encerramento de
@@ -53,19 +56,21 @@
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
  *
- * TODO(decisão) — tipos que o documento NÃO define regra explícita para. Em vez de arriscar
- * um chute de Efetiva/Adiada, ficam de fora da população avaliada (filtro WHERE de
- * audiencias_realizadas) até decisão do usuário/SETIC:
- *   - 8  Instrução e Julgamento (audiência única que já conclui com julgamento — é uma
- *        variante de Instrução, ou deve ter regra própria já que não depende de sinal
- *        posterior?)
- *   - 7  UNA-RS ou Justificação Prévia / 9 Una - RS (o que significa "RS" aqui? variante
- *        de UNA ou outra coisa?)
- *   - Totalmente fora do documento: Conciliação em Conhecimento (1, 32, 20, 33),
- *     Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
- *     juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28),
- *     Pública (17, 30). Ficam fora da população avaliada (WHERE) até decisão do usuário
- *     sobre se entram e com qual regra.
+ * DECIDIDO pelo usuário: tipos totalmente fora do documento (Conciliação em Conhecimento
+ * (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
+ * juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública
+ * (17, 30)) FICAM DE FORA da população avaliada. Já implementado assim (o WHERE de
+ * audiencias_realizadas só inclui tipo_inicial/tipo_una/tipo_instrucao) — nenhuma mudança
+ * necessária.
+ *
+ * TODO(decisão) — ainda pendentes:
+ *   - 8  Instrução e Julgamento (audiência única que já conclui com julgamento — segue a
+ *        árvore da Instrução (seção 2.4), ou tem regra própria já que não depende de sinal
+ *        posterior? Ver árvore detalhada na conversa/seção 2 do doc de análise.)
+ *   - 7  UNA-RS ou Justificação Prévia / 9 Una - RS — hipótese (não confirmada): "RS" =
+ *        "Rito Sumário", o terceiro rito trabalhista (CLT/Lei 5.584/70), distinto do
+ *        sumaríssimo (Lei 9.957/2000) já mapeado acima. Se confirmado, esses ids entrariam no
+ *        grupo tipo_una. Ainda não aplicado — aguardando confirmação antes de alterar o array.
  *
  * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) confirmados pelo usuário:
  *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
@@ -78,13 +83,15 @@
  *                                  prazo válido (tb_proc_parte_expediente.dt_prazo_legal_parte
  *                                  >= CURRENT_DATE)
  *
- * ATENÇÃO — achado na query ORIGINAL (não só neste rascunho): os ids 941 e 371 que ela usa
- * como sinal extra de "Efetiva" (`OR e.id_evento IN (941, 371)`) correspondem, pela mesma
- * amostra, a "Declarada a incompetência" (941) e "Acolhida a exceção de incompetência" (371)
- * — nada relacionado a sentença/julgamento. Pode ser intencional (processo resolvido/remetido
- * por incompetência também conta como audiência que cumpriu seu papel), mas vale confirmar
- * com a SETIC antes de decidir se esse sinal entra ou não na v2. Não incluído no rascunho
- * abaixo até essa confirmação.
+ * DECIDIDO pelo usuário ("mantém"): os ids 941 (Declarada a incompetência) e 371 (Acolhida a
+ * exceção de incompetência) — sinal legado da query ORIGINAL (`OR e.id_evento IN (941, 371)`) —
+ * continuam valendo como sinal de Efetiva na v2, com prioridade máxima no CASE de
+ * classificacao (CTE incompetencia_na_janela), igual à query original.
+ *
+ * DECIDIDO pelo usuário: a janela de 3 dias úteis só vale onde o documento a determina
+ * explicitamente (UNA/Instrução — regras 3 e 4 acima). A Regra Geral (1) e a regra da Inicial
+ * (2) NÃO têm janela — já implementado assim (proxima_audiencia/audiencias_subsequentes não
+ * aplicam nenhum limite de data), nenhuma mudança necessária.
  *
  * TODO(decisão SETIC) — "Prolação de sentença" hoje só cobre sentença DE MÉRITO (219/220/221/
  * 50110/50118). tb_evento (categorias) confirma que também existem sentenças TERMINATIVAS
@@ -274,6 +281,25 @@ movimentos_diligencia AS (
             AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
 ),
 
+-- Sinal LEGADO da query ORIGINAL, mantido por decisão explícita do usuário ("mantém"): Declarada
+-- a incompetência (941) / Acolhida a exceção de incompetência (371) dentro da janela também
+-- torna a audiência Efetiva. Na query original esse sinal vivia dentro do mesmo bloco NOT EXISTS
+-- que decidia Adiada — ou seja, tinha prioridade sobre qualquer outra condição, inclusive sobre
+-- uma eventual redesignação de mesma categoria. Reproduzido aqui com a mesma prioridade máxima
+-- no CASE de classificacao, para todos os tipos (Inicial/UNA/Instrução), não só UNA/Instrução.
+-- Ajuste assumido (não pedido explicitamente): a janela usada é a de 3 dias úteis do restante da
+-- v2 (calendario_3du), não os 5 dias corridos da query original — manter dois sistemas de janela
+-- diferentes na mesma query pareceu desnecessário. Sinalizar se isso não for o esperado.
+incompetencia_na_janela AS (
+    SELECT DISTINCT r.id_processo_audiencia
+    FROM audiencias_realizadas r
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
+    INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
+    WHERE tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
+        AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
+        AND tpe.id_evento IN (941, 371) -- Declarada a incompetência / Acolhida exceção de incompetência
+),
+
 -- Encerramento de Instrução designado dentro da janela de 3 dias úteis — checagem GERAL
 -- (qualquer audiência subsequente desse tipo dentro da janela, via audiencias_subsequentes),
 -- não só "a próxima". Na bipartição UNA->Instrução, o Encerramento normalmente vem DEPOIS da
@@ -338,6 +364,10 @@ classificacao AS (
     SELECT
         r.*,
         CASE
+            -- 0) Sinal legado (incompetência) — prioridade máxima, mantido igual à query
+            --    original (decisão do usuário). Vale para todos os tipos avaliados.
+            WHEN inc.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
+
             -- 1) Regra geral: redesignação da MESMA CATEGORIA. Agrupa variantes sumaríssimo/
             --    videoconferência via os arrays de parametros — uma versão anterior deste
             --    rascunho comparava o id exato (pa.id_tipo_audiencia_proxima = r.id_tipo_audiencia),
@@ -394,6 +424,7 @@ classificacao AS (
     LEFT JOIN movimentos_diligencia md ON md.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN movimentos_julgamento mj ON mj.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN encerramento_instrucao_na_janela enc ON enc.id_processo_audiencia = r.id_processo_audiencia
+    LEFT JOIN incompetencia_na_janela inc ON inc.id_processo_audiencia = r.id_processo_audiencia
 )
 SELECT
     nr_processo, id_processo,
