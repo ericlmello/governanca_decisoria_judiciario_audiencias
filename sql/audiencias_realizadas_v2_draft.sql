@@ -101,14 +101,10 @@ proxima_audiencia AS (
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de
 -- pje.tb_calendario_eventos (achado do usuário — substitui a função hipotética
 -- fn_soma_dias_uteis do rascunho anterior).
--- TODO(confirmar): qual flag realmente delimita "dia útil" para esta regra:
---   in_suspende_prazo (usado abaixo, por ser o mais próximo do conceito de prazo
---   processual "3 dias úteis"), in_feriado (feriado stricto sensu) ou
---   in_suspende_audiencia (dia sem pauta de audiência, que é um conceito distinto)?
--- TODO(confirmar): abrangência do registro do calendário — hoje o filtro considera
--- válido um registro nacional (id_orgao_julgador IS NULL) OU específico da vara da
--- audiência; falta confirmar os valores possíveis de in_abrangencia/id_estado/
--- id_municipio para replicar corretamente feriados estaduais/municipais.
+-- Definido pelo usuário: dia útil = não suspende audiência E não suspende prazo.
+-- Abrangência: nacional (id_orgao_julgador/id_estado IS NULL) ou estado de SP (id_estado = 26).
+-- TODO(confirmar): id_municipio não está sendo considerado (usuário só mencionou estado);
+-- se houver feriado municipal relevante para alguma vara, precisa entrar aqui também.
 calendario_3du AS (
     SELECT
         r.id_processo_audiencia,
@@ -126,8 +122,9 @@ calendario_3du AS (
                       SELECT 1
                       FROM pje.tb_calendario_eventos ce
                       WHERE ce.in_ativo = 'S'
-                        AND ce.in_suspende_prazo = 'S' -- TODO(confirmar) ver nota acima
+                        AND (ce.in_suspende_prazo = 'S' OR ce.in_suspende_audiencia = 'S')
                         AND (ce.id_orgao_julgador IS NULL OR ce.id_orgao_julgador = r.id_orgao_julgador)
+                        AND (ce.id_estado IS NULL OR ce.id_estado = 26) -- SP
                         AND make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia) = dia::date
                   )
             ) dias_uteis

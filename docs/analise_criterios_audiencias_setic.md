@@ -106,16 +106,17 @@ O usuário indicou duas tabelas que resolvem parte das divergências 4 e 5 da se
   Passou a ser a fonte principal de texto nas CTEs `movimentos_diligencia` e
   `movimentos_julgamento` do rascunho v2 (`sql/audiencias_realizadas_v2_draft.sql`).
 
-Ainda **não confirmado** (nenhuma das duas tabelas foi consultada contra dados reais):
+**Decidido pelo usuário:**
 
-- Qual flag de `tb_calendario_eventos` corresponde a "dia útil" para esta regra:
-  `in_suspende_prazo` (o que o rascunho usa hoje, por ser o mais próximo do conceito de prazo
-  processual "3 dias úteis"), `in_feriado` (feriado em sentido estrito) ou
-  `in_suspende_audiencia` (dia sem pauta de audiência — conceito distinto, não necessariamente
-  o mesmo que "não conta para o prazo")?
-- Como tratar `in_abrangencia`/`id_estado`/`id_municipio` para feriados estaduais/municipais —
-  hoje o rascunho só considera um registro válido se `id_orgao_julgador IS NULL` (nacional) ou
-  igual ao da vara da audiência, ignorando estado/município.
+- Dia útil = dia em que `in_suspende_prazo <> 'S'` **e** `in_suspende_audiencia <> 'S'` (ambos
+  precisam estar livres). Implementado na CTE `calendario_3du` com
+  `(ce.in_suspende_prazo = 'S' OR ce.in_suspende_audiencia = 'S')` dentro do `NOT EXISTS`.
+- Abrangência: nacional (`id_orgao_julgador IS NULL`/`id_estado IS NULL`) **ou** estado de São
+  Paulo (`id_estado = 26`). `id_municipio` segue sem tratamento — se algum feriado municipal for
+  relevante para alguma vara específica, precisa ser adicionado depois.
+
+Ainda **não confirmado**:
+
 - Textos reais de `ds_movimento` para cada um dos 8 movimentos monitorados (seção 2.5) —
   a query 4.2 abaixo foi adaptada para `tb_evento_processual`, mas os padrões `ILIKE` ainda são
   chute por convenção de nomenclatura, não confirmados.
@@ -126,8 +127,9 @@ Ainda **não confirmado** (nenhuma das duas tabelas foi consultada contra dados 
 ## 4. Queries de descoberta (rodar contra `pje_1grau_cds` quando houver acesso)
 
 ```sql
--- 4.1 Tipos de audiência existentes (para localizar Inicial, UNA, Instrução,
---     Encerramento de Instrução, Julgamento)
+-- 4.1 Tipos de audiência existentes (RESPOSTA à pergunta "em qual tabela encontro os
+-- ids dos tipos de audiência?" — é a mesma tabela já usada na query original, alias `tta`)
+-- Localiza os ids de Inicial, UNA, Instrução, Encerramento de Instrução, Julgamento.
 SELECT id_tipo_audiencia, ds_tipo_audiencia
 FROM pje.tb_tipo_audiencia
 ORDER BY 1;
@@ -166,26 +168,31 @@ FROM information_schema.columns
 WHERE table_schema = 'pje'
   AND (table_name ILIKE '%pericia%' OR table_name ILIKE '%perito%' OR table_name ILIKE '%laudo%');
 
--- 4.5 Distribuição dos flags de tb_calendario_eventos, para decidir qual usar como
--- "dia útil" (in_feriado / in_suspende_prazo / in_suspende_audiencia) e os valores
--- possíveis de in_abrangencia
-SELECT in_feriado, in_suspende_prazo, in_suspende_audiencia, in_abrangencia, COUNT(*)
+-- 4.5 Validação da regra de dia útil já decidida (in_suspende_prazo OU in_suspende_audiencia,
+-- abrangência nacional ou SP/26) — conferir se a contagem de dias não-úteis por ano é plausível
+SELECT dt_ano, COUNT(*) AS dias_nao_uteis
 FROM pje.tb_calendario_eventos
 WHERE in_ativo = 'S'
-GROUP BY 1, 2, 3, 4
-ORDER BY 1, 2, 3, 4;
+  AND (in_suspende_prazo = 'S' OR in_suspende_audiencia = 'S')
+  AND (id_orgao_julgador IS NULL OR id_estado IS NULL OR id_estado = 26)
+GROUP BY dt_ano
+ORDER BY dt_ano;
 ```
 
 ## 5. Próximos passos sugeridos
 
-1. Rodar as queries da seção 4 e devolver os resultados (ou liberar acesso de rede da sessão à
-   base interna) para eu confirmar os `id_tipo_audiencia`/`id_evento`/`ds_movimento` corretos e
-   os flags de `tb_calendario_eventos` a usar.
-2. ~~Definir como calcular "3 dias úteis"~~ — resolvido: `tb_calendario_eventos` +
-   `generate_series`, implementado na CTE `calendario_3du` do rascunho v2. Falta só confirmar
-   qual flag usar (ver seção 3.1) e validar o resultado contra casos reais conhecidos.
-3. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
+1. ~~Definir como calcular "3 dias úteis"~~ — **resolvido**: `tb_calendario_eventos` +
+   `generate_series`, implementado na CTE `calendario_3du` do rascunho v2. Regra: dia útil =
+   `in_suspende_prazo <> 'S'` e `in_suspende_audiencia <> 'S'`; abrangência nacional ou
+   estado de SP (`id_estado = 26`). Falta rodar a query 4.5 pra validar o resultado contra
+   casos reais conhecidos.
+2. Rodar a query 4.1 e devolver o resultado para eu confirmar os `id_tipo_audiencia` de
+   Inicial/UNA/Instrução/Encerramento de Instrução/Julgamento (hoje o rascunho usa
+   `1/2/3/4` como placeholders — `4` é o único herdado da query original).
+3. Rodar a query 4.2 e devolver o resultado para eu confirmar os textos/padrões reais de
+   `ds_movimento` dos 8 movimentos monitorados.
+4. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
    perícias do PAI" ou tratar como fora de escopo desta query. Ainda depende de localizar a(s)
    tabela(s) de perito/laudo (query 4.4).
-4. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
+5. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
    incluído neste PR) substituindo os `-- TODO(confirmar)` restantes.
