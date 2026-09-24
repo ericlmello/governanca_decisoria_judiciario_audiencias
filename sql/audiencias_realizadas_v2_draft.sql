@@ -201,9 +201,8 @@ calendario_3du AS (
 -- independente de quando foi marcada, desde que aberta e com prazo válido na data de
 -- referência. Mantido com o mesmo critério de janela por consistência com os outros
 -- movimentos, até confirmação.
--- TODO(confirmar): referência de "prazo válido" usa CURRENT_DATE; o relatório original do
--- painel de perícias usa CURRENT_DATE - 1 dia como "data de referência" — confirmar se deve
--- seguir o mesmo padrão aqui.
+-- Decidido pelo usuário: referência de "prazo válido" = CURRENT_DATE - 1 dia, igual à "Data de
+-- referência do relatório" do painel de perícias original.
 movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
@@ -229,7 +228,7 @@ movimentos_diligencia AS (
     WHERE pp.cd_status_pericia IN ('L', 'S', 'A', 'M') -- laudo em aberto (não finalizado)
         AND pex.ds_origem_expediente = 'PERICIA'
         AND pdi.in_principal = 'S'
-        AND ppex.dt_prazo_legal_parte >= CURRENT_DATE -- prazo válido/não vencido
+        AND ppex.dt_prazo_legal_parte >= CURRENT_DATE - INTERVAL '1 day' -- prazo válido/não vencido
         AND pp.dt_marcacao BETWEEN date_trunc('day', r.dta_audiencia::date)
             AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
 ),

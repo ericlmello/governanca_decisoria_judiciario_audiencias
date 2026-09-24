@@ -160,12 +160,14 @@ Implementado na CTE `movimentos_diligencia` (segundo `SELECT` do `UNION`, em
 `dt_prazo_legal_parte >= CURRENT_DATE` (prazo válido) conta como diligência. Prazo vencido segue
 fora de escopo (regras do próprio painel de perícias, ponto 5 do cabeçalho do rascunho).
 
+**Decidido pelo usuário:** referência de "prazo válido" = `CURRENT_DATE - 1 dia`, igual à "Data
+de referência do relatório" do painel de perícias original. Implementado em
+`movimentos_diligencia` (`ppex.dt_prazo_legal_parte >= CURRENT_DATE - INTERVAL '1 day'`).
+
 **Ainda não confirmado:**
 - Se a janela de 3 dias úteis deve se aplicar à data de marcação da perícia (`pp.dt_marcacao`),
   como para os demais movimentos, ou se "perícia ativa" deve contar independente de quando foi
   marcada (já que é um estado contínuo, não um ato pontual como expedir um documento).
-- Se a referência de "prazo válido" deve ser `CURRENT_DATE` ou `CURRENT_DATE - 1 dia`, como no
-  relatório original do painel de perícias (`"Data de referência do relatório"`).
 
 ## 3.2 Códigos de movimento confirmados (amostra de `tb_evento_processual`)
 
@@ -286,8 +288,8 @@ ORDER BY dt_ano;
    em `movimentos_julgamento` no rascunho (ver seção 3.2).
 6. Rodar a query 4.5 para validar a regra de dia útil contra a contagem real de dias não-úteis
    por ano.
-7. Decidir se a janela de 3 dias úteis se aplica à marcação da perícia (`pp.dt_marcacao`) e se
-   a referência de "prazo válido" é `CURRENT_DATE` ou `CURRENT_DATE - 1 dia` (ver seção 3.3).
+7. Decidir se a janela de 3 dias úteis se aplica à marcação da perícia (`pp.dt_marcacao`) (ver
+   seção 3.3; a referência de prazo válido já foi decidida: `CURRENT_DATE - 1 dia`).
 8. Rodar a query 4.2.2 para checar se existe uma tabela de complemento estruturada para "tipo de
    documento" expedido (alternativa mais robusta ao `ILIKE` em `ds_texto_final_externo` usado
    hoje para diferenciar ofício/carta precatória/mandado, todos sob o código `60`).
