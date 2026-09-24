@@ -8,11 +8,35 @@ Audiências — Definição de Efetivas/Adiadas e impactos no IAD).
 
 **Importante:** não foi possível conectar à base `10.2.36.13:3032` (`pje_1grau_cds`) a partir
 deste ambiente — é um IP privado (RFC1918), inacessível a partir do container isolado na nuvem
-usado nesta sessão (sem VPN/rota para a rede interna do TRT). Por isso, os `id_tipo_audiencia`,
-`id_evento` e demais valores de referência citados abaixo **não puderam ser confirmados contra
-o banco real**. A seção 4 traz as queries de descoberta prontas para rodar assim que houver
-acesso, e a query revisada (seção 5) marca com `-- TODO(confirmar)` todo ponto que depende
-dessa confirmação.
+usado nesta sessão (sem VPN/rota para a rede interna do TRT). O usuário rodou as queries de
+descoberta manualmente e colou os resultados; os pontos que ainda dependem de confirmação contra
+o banco real seguem marcados com `-- TODO(confirmar)` (schema) ou `-- TODO(decisão)` (regra de
+negócio) em `sql/audiencias_realizadas_v2_draft.sql`.
+
+## 0. `id_tipo_audiencia` confirmados (pje.tb_tipo_audiencia)
+
+O usuário rodou a query 4.1 e devolveu os 36 tipos cadastrados. Mapeamento para as categorias do
+documento:
+
+| Categoria (documento) | ids |
+|---|---|
+| Inicial | 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo) |
+| UNA | 5, 19 (sumaríssimo), 23 (videoconf), 31 (videoconf sumaríssimo) |
+| Instrução | 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo) |
+| Encerramento de Instrução | 10, 25 (videoconf) |
+| Julgamento | 4 (confirma o que a query original já assumia) |
+
+**Ambíguos/fora do documento — decisão do usuário pendente:**
+
+- `8` Instrução e Julgamento — variante de Instrução, ou regra própria (sempre Efetiva, já que
+  não depende de sinal posterior)?
+- `7` UNA-RS ou Justificação Prévia / `9` Una - RS — o que significa "RS"? Variante de UNA ou
+  outra coisa?
+- Totalmente fora do documento (não aparecem em nenhuma seção da árvore de decisão):
+  Conciliação em Conhecimento (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37),
+  Inquirição de testemunha — juízo deprecado (11, 26), Justificação Prévia (18), Mediação
+  (13, 14, 15, 28), Pública (17, 30). Ficam fora da população avaliada em
+  `sql/audiencias_realizadas_v2_draft.sql` até o usuário decidir se entram e com qual regra.
 
 ## 1. Resumo da lógica atual (query original)
 
@@ -186,13 +210,16 @@ ORDER BY dt_ano;
    `in_suspende_prazo <> 'S'` e `in_suspende_audiencia <> 'S'`; abrangência nacional ou
    estado de SP (`id_estado = 26`). Falta rodar a query 4.5 pra validar o resultado contra
    casos reais conhecidos.
-2. Rodar a query 4.1 e devolver o resultado para eu confirmar os `id_tipo_audiencia` de
-   Inicial/UNA/Instrução/Encerramento de Instrução/Julgamento (hoje o rascunho usa
-   `1/2/3/4` como placeholders — `4` é o único herdado da query original).
-3. Rodar a query 4.2 e devolver o resultado para eu confirmar os textos/padrões reais de
+2. ~~Rodar a query 4.1~~ — **resolvido**: ver seção 0. `id_tipo_audiencia` de Inicial, UNA,
+   Instrução, Encerramento de Instrução e Julgamento confirmados e já aplicados no rascunho v2
+   via a CTE `parametros`.
+3. Decidir os itens ambíguos/fora do documento listados na seção 0 (tipo 8 "Instrução e
+   Julgamento"; tipos 7/9 "...RS"; e o bloco Conciliação/Mediação/Pública/Inquirição/
+   Justificação Prévia, hoje fora da população avaliada).
+4. Rodar a query 4.2 e devolver o resultado para eu confirmar os textos/padrões reais de
    `ds_movimento` dos 8 movimentos monitorados.
-4. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
+5. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
    perícias do PAI" ou tratar como fora de escopo desta query. Ainda depende de localizar a(s)
    tabela(s) de perito/laudo (query 4.4).
-5. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
-   incluído neste PR) substituindo os `-- TODO(confirmar)` restantes.
+6. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
+   incluído neste PR) substituindo os `-- TODO(confirmar)`/`-- TODO(decisão)` restantes.
