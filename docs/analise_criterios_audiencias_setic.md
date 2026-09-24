@@ -172,6 +172,26 @@ remetido por incompetência também conta como audiência que cumpriu seu papel)
 confirmar com a SETIC** antes de decidir se esse sinal é replicado na v2 — por ora, o rascunho
 não o inclui.
 
+**Confirmação cruzada via `pje.tb_evento` (id_evento, ds_evento — rótulo curto/categoria, o
+usuário devolveu essa tabela também):** bate com tudo acima —
+`60 = "Expedição de documento"`, `51 = "Conclusão"`, `219/220/221 = "Procedência"/
+"Improcedência"/"Procedência em parte"`, `466 = "Homologação de transação"`,
+`941/371/374 = "Incompetência"` (reforça o achado acima), `970 = "Audiência"` (confirma que é
+genérico demais para servir de sinal de "marcação de julgamento" — por isso o rascunho continua
+detectando isso via novo registro em `tb_processo_audiencia`, não via movimento). Perícia
+continua sem nenhuma entrada, nem em nível de categoria.
+
+**Pendência nova — sentença terminativa:** `tb_evento` também mostra categorias de sentença que
+**não resolve o mérito** (extinção do processo): `456 Extinção` e subcausas (`458` abandono da
+causa, `459` ausência de pressupostos processuais, `461` ausência das condições da ação, `463`
+desistência, `464` ação intransmissível, `465` confusão entre autor e réu), `454` indeferimento
+da petição inicial, e `50126 Julgamento antecipado parcial (SEM resolução do mérito)`. Uma
+sentença terminativa também encerra a fase de conhecimento, então pode se qualificar como
+"Prolação de sentença" tanto quanto uma sentença de mérito — hoje o rascunho só considera as de
+mérito (219/220/221/50110/50118). **Perguntei ao usuário; a resposta foi "preciso confirmar com
+a SETIC"** — os códigos terminativos ficam comentados (não ativos) em
+`movimentos_julgamento`, prontos para descomentar quando a decisão vier.
+
 ## 4. Queries de descoberta (rodar contra `pje_1grau_cds` quando houver acesso)
 
 ```sql
@@ -243,6 +263,9 @@ ORDER BY dt_ano;
    — hoje fora da população avaliada.
 5. Confirmar com a SETIC se os ids `941`/`371` da query **original** (achado da seção 3.2) devem
    ser replicados na v2 como sinal de efetividade.
+5.1 Confirmar com a SETIC se "Prolação de sentença" deve incluir sentença terminativa (extinção
+   sem resolução do mérito — códigos 456/458/459/461/463/464/465/454/50126), hoje comentados
+   em `movimentos_julgamento` no rascunho (ver seção 3.2).
 6. Rodar a query 4.5 para validar a regra de dia útil contra a contagem real de dias não-úteis
    por ano.
 7. Localizar a tabela de perito/laudo para a condição de "perícia ativa" (query 4.4) e decidir o

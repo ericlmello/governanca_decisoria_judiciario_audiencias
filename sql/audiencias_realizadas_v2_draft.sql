@@ -54,6 +54,14 @@
  * por incompetência também conta como audiência que cumpriu seu papel), mas vale confirmar
  * com a SETIC antes de decidir se esse sinal entra ou não na v2. Não incluído no rascunho
  * abaixo até essa confirmação.
+ *
+ * TODO(decisão SETIC) — "Prolação de sentença" hoje só cobre sentença DE MÉRITO (219/220/221/
+ * 50110/50118). tb_evento (categorias) confirma que também existem sentenças TERMINATIVAS
+ * (extinção sem resolução do mérito): 456 Extinção e subcausas 458/459/461/463/464/465,
+ * 454 Indeferimento da petição inicial, 50126 Julgamento antecipado parcial (SEM resolução do
+ * mérito). Uma sentença terminativa também encerra a fase de conhecimento — pendente de
+ * confirmação com a SETIC se deve contar como "Prolação de sentença" aqui. Não incluída no
+ * rascunho por ora.
  */
 
 WITH parametros AS (
@@ -204,9 +212,10 @@ movimentos_diligencia AS (
 --     mérito), 50118 (liminarmente improcedente).
 --   - Homologação de acordo: não existe como texto literal "homologação de acordo"; o termo
 --     técnico trabalhista usado é "transação" — código 466 "Homologada a transação".
--- TODO(confirmar): validar a lista de códigos de "prolação de sentença" contra casos reais
--- (pode haver outras variações não cobertas: acordo homologado que extingue com resolução do
--- mérito, sentenças em cumprimento/execução, etc.).
+-- TODO(decisão SETIC): "Prolação de sentença" hoje só cobre sentença DE MÉRITO. Existem
+-- também candidatos a sentença TERMINATIVA (extinção sem resolução do mérito), não incluídos
+-- até confirmação: 456 (Extinção) e subcausas 458/459/461/463/464/465, 454 (Indeferimento da
+-- petição inicial), 50126 (Julgamento antecipado parcial SEM resolução do mérito).
 movimentos_julgamento AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
@@ -217,7 +226,8 @@ movimentos_julgamento AS (
             AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
         AND (
             (tpe.id_evento = 51 AND tpe.ds_texto_final_externo ILIKE '%sentença%') -- Conclusão p/ sentença
-            OR tpe.id_evento IN (219, 220, 221, 50110, 50118) -- Prolação de sentença
+            OR tpe.id_evento IN (219, 220, 221, 50110, 50118) -- Prolação de sentença (mérito)
+            -- OR tpe.id_evento IN (456, 458, 459, 461, 463, 464, 465, 454, 50126) -- sentença terminativa (TODO decisão SETIC)
             OR tpe.id_evento = 466 -- Homologada a transação (homologação de acordo)
         )
     LEFT JOIN proxima_audiencia pa ON pa.id_processo_audiencia = r.id_processo_audiencia
