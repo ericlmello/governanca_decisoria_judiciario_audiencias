@@ -91,6 +91,38 @@ Se o magistrado **redesigna audiência da mesma categoria** da que acabou de oco
 | 7 | **Dependência externa "painel de perícias do PAI"** | Não existe | Perícia com prazo vencido segue outra régua, de outro indicador | Fora do escopo desta query — precisa decidir se é sinalizada como "depende de outro painel" ou tratada como não-diligência aqui |
 | 8 | **`ds_classe_judicial` já é buscado mas não usado na decisão** | Join existe, mas classe não entra em nenhum `WHERE`/`EXISTS` | Documento cita "rito ordinário ou sumaríssimo" só como contexto do título da seção UNA, sem regra diferente por rito | Sem impacto direto — apenas confirmar que não há regra oculta por rito antes de assumir isso |
 
+## 3.1 Atualizações (calendário de dias úteis e tabela de movimentos)
+
+O usuário indicou duas tabelas que resolvem parte das divergências 4 e 5 da seção 3:
+
+- **`pje.tb_calendario_eventos`** — tem `dt_dia`/`dt_mes`/`dt_ano`, `in_feriado`,
+  `in_ativo`, `id_orgao_julgador`, `id_estado`, `id_municipio`, `in_abrangencia`,
+  `in_suspende_prazo` e `in_suspende_audiencia`. Dá para calcular "N dias úteis a partir de uma
+  data" em SQL puro (sem função nova), via `generate_series` + `NOT EXISTS` contra essa tabela —
+  implementado na CTE `calendario_3du` do rascunho v2.
+- **`pje.tb_evento_processual`** (`id_evento_processual = id_evento` de `pje.tb_evento`) — tem a
+  coluna `ds_movimento`, provavelmente o nome do movimento padronizado (possivelmente a Tabela
+  Processual Unificada do CNJ), mais confiável para casar texto do que `tb_evento.ds_evento`.
+  Passou a ser a fonte principal de texto nas CTEs `movimentos_diligencia` e
+  `movimentos_julgamento` do rascunho v2 (`sql/audiencias_realizadas_v2_draft.sql`).
+
+Ainda **não confirmado** (nenhuma das duas tabelas foi consultada contra dados reais):
+
+- Qual flag de `tb_calendario_eventos` corresponde a "dia útil" para esta regra:
+  `in_suspende_prazo` (o que o rascunho usa hoje, por ser o mais próximo do conceito de prazo
+  processual "3 dias úteis"), `in_feriado` (feriado em sentido estrito) ou
+  `in_suspende_audiencia` (dia sem pauta de audiência — conceito distinto, não necessariamente
+  o mesmo que "não conta para o prazo")?
+- Como tratar `in_abrangencia`/`id_estado`/`id_municipio` para feriados estaduais/municipais —
+  hoje o rascunho só considera um registro válido se `id_orgao_julgador IS NULL` (nacional) ou
+  igual ao da vara da audiência, ignorando estado/município.
+- Textos reais de `ds_movimento` para cada um dos 8 movimentos monitorados (seção 2.5) —
+  a query 4.2 abaixo foi adaptada para `tb_evento_processual`, mas os padrões `ILIKE` ainda são
+  chute por convenção de nomenclatura, não confirmados.
+- Se "Marcação de audiência de julgamento" deve ser detectada como movimento em
+  `tb_evento_processual` ou apenas como novo registro em `tb_processo_audiencia` com
+  `id_tipo_audiencia` = Julgamento (o rascunho hoje usa a segunda via, igual à query original).
+
 ## 4. Queries de descoberta (rodar contra `pje_1grau_cds` quando houver acesso)
 
 ```sql
@@ -100,15 +132,28 @@ SELECT id_tipo_audiencia, ds_tipo_audiencia
 FROM pje.tb_tipo_audiencia
 ORDER BY 1;
 
--- 4.2 Eventos candidatos aos "movimentos monitorados" (ajustar termos de busca)
-SELECT id_evento, ds_evento, ds_caminho_completo
-FROM pje.tb_evento
-WHERE ds_evento ILIKE ANY (ARRAY[
+-- 4.2 Movimentos candidatos aos "movimentos monitorados" (ajustar termos de busca)
+-- Usa tb_evento_processual.ds_movimento (indicado pelo usuário como fonte mais confiável
+-- que tb_evento.ds_evento), cruzando com tb_evento só para trazer o id_evento/caminho.
+SELECT e.id_evento, e.ds_evento, e.ds_caminho_completo, ep.ds_movimento
+FROM pje.tb_evento e
+INNER JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
+WHERE ep.ds_movimento ILIKE ANY (ARRAY[
     '%perícia%', '%pericia%', '%ofício%', '%oficio%', '%carta precatória%',
     '%carta precatoria%', '%mandado%', '%conclus%sentença%', '%conclus%sentenca%',
     '%prolação%sentença%', '%prolacao%sentenca%', '%homologa%acordo%'
 ])
-ORDER BY ds_evento;
+ORDER BY ep.ds_movimento;
+
+-- 4.2.1 Amostra de tb_calendario_eventos para entender os flags de dia útil/feriado
+-- (in_feriado x in_suspende_prazo x in_suspende_audiencia) e o alcance de
+-- id_orgao_julgador/id_estado/id_municipio/in_abrangencia
+SELECT *
+FROM pje.tb_calendario_eventos
+WHERE in_ativo = 'S'
+  AND dt_ano = EXTRACT(YEAR FROM CURRENT_DATE)
+ORDER BY dt_mes, dt_dia
+LIMIT 100;
 
 -- 4.3 Confirmar os ids já usados na query original (941, 371)
 SELECT id_evento, ds_evento, ds_caminho_completo
@@ -121,19 +166,26 @@ FROM information_schema.columns
 WHERE table_schema = 'pje'
   AND (table_name ILIKE '%pericia%' OR table_name ILIKE '%perito%' OR table_name ILIKE '%laudo%');
 
--- 4.5 Verificar existência de calendário/feriados para cálculo de dias úteis
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = 'pje' AND table_name ILIKE '%feriado%';
+-- 4.5 Distribuição dos flags de tb_calendario_eventos, para decidir qual usar como
+-- "dia útil" (in_feriado / in_suspende_prazo / in_suspende_audiencia) e os valores
+-- possíveis de in_abrangencia
+SELECT in_feriado, in_suspende_prazo, in_suspende_audiencia, in_abrangencia, COUNT(*)
+FROM pje.tb_calendario_eventos
+WHERE in_ativo = 'S'
+GROUP BY 1, 2, 3, 4
+ORDER BY 1, 2, 3, 4;
 ```
 
 ## 5. Próximos passos sugeridos
 
 1. Rodar as queries da seção 4 e devolver os resultados (ou liberar acesso de rede da sessão à
-   base interna) para eu confirmar os `id_tipo_audiencia`/`id_evento` corretos.
-2. Definir como calcular "3 dias úteis" (função de calendário útil já existente no schema, ou
-   precisa ser criada).
+   base interna) para eu confirmar os `id_tipo_audiencia`/`id_evento`/`ds_movimento` corretos e
+   os flags de `tb_calendario_eventos` a usar.
+2. ~~Definir como calcular "3 dias úteis"~~ — resolvido: `tb_calendario_eventos` +
+   `generate_series`, implementado na CTE `calendario_3du` do rascunho v2. Falta só confirmar
+   qual flag usar (ver seção 3.1) e validar o resultado contra casos reais conhecidos.
 3. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
-   perícias do PAI" ou tratar como fora de escopo desta query.
+   perícias do PAI" ou tratar como fora de escopo desta query. Ainda depende de localizar a(s)
+   tabela(s) de perito/laudo (query 4.4).
 4. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
-   incluído neste PR) substituindo os placeholders `-- TODO(confirmar)`.
+   incluído neste PR) substituindo os `-- TODO(confirmar)` restantes.

@@ -73,9 +73,11 @@ WITH audiencias_realizadas AS (
         AND tpa.id_tipo_audiencia NOT IN (4 /* Julgamento */ /*, :TIPO_ENCERRAMENTO_INSTRUCAO */)
         AND tpt.cd_processo_status = 'D'
         AND date_trunc('day', tpa.dt_inicio) > '${VAR_ULT_DT_AUDIENCIA}'
-        -- TODO(confirmar): buffer de segurança recalculado para 3 dias ÚTEIS (não 5 corridos)
-        -- assim que houver função/tabela de dias úteis disponível no schema.
-        and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 6)
+        -- TODO(confirmar): buffer de segurança para a janela de 3 dias úteis fechar antes da
+        -- audiência entrar no resultado. 10 dias corridos cobre folgadamente 3 dias úteis mesmo
+        -- com fim de semana + 1 feriado no meio; ajustar depois que o cálculo real de dias
+        -- úteis (CTE calendario_3du abaixo) estiver validado.
+        and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 10)
 ),
 
 -- Próxima audiência (de qualquer tipo) designada para o mesmo processo após a atual.
@@ -96,22 +98,63 @@ proxima_audiencia AS (
     ) tpa2 ON TRUE
 ),
 
+-- Data-limite do 3º dia útil após a audiência, calculada a partir de
+-- pje.tb_calendario_eventos (achado do usuário — substitui a função hipotética
+-- fn_soma_dias_uteis do rascunho anterior).
+-- TODO(confirmar): qual flag realmente delimita "dia útil" para esta regra:
+--   in_suspende_prazo (usado abaixo, por ser o mais próximo do conceito de prazo
+--   processual "3 dias úteis"), in_feriado (feriado stricto sensu) ou
+--   in_suspende_audiencia (dia sem pauta de audiência, que é um conceito distinto)?
+-- TODO(confirmar): abrangência do registro do calendário — hoje o filtro considera
+-- válido um registro nacional (id_orgao_julgador IS NULL) OU específico da vara da
+-- audiência; falta confirmar os valores possíveis de in_abrangencia/id_estado/
+-- id_municipio para replicar corretamente feriados estaduais/municipais.
+calendario_3du AS (
+    SELECT
+        r.id_processo_audiencia,
+        (
+            SELECT dia::date
+            FROM (
+                SELECT dia, ROW_NUMBER() OVER (ORDER BY dia) AS rn
+                FROM generate_series(
+                    r.dta_audiencia::date + INTERVAL '1 day',
+                    r.dta_audiencia::date + INTERVAL '15 day',
+                    INTERVAL '1 day'
+                ) AS dia
+                WHERE EXTRACT(DOW FROM dia) NOT IN (0, 6)  -- exclui sáb/dom
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM pje.tb_calendario_eventos ce
+                      WHERE ce.in_ativo = 'S'
+                        AND ce.in_suspende_prazo = 'S' -- TODO(confirmar) ver nota acima
+                        AND (ce.id_orgao_julgador IS NULL OR ce.id_orgao_julgador = r.id_orgao_julgador)
+                        AND make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia) = dia::date
+                  )
+            ) dias_uteis
+            WHERE dias_uteis.rn = 3
+        ) AS limite_3_dias_uteis
+    FROM audiencias_realizadas r
+),
+
 -- Movimentos de diligência (perícia ativa, ofício, carta precatória, mandado)
 -- em até 3 dias úteis após a audiência.
--- TODO(confirmar): ids/ds_caminho_completo reais (rodar query 4.2 do doc de análise)
--- e função de "N dias úteis a partir de uma data" (placeholder: fn_soma_dias_uteis).
+-- TODO(confirmar): textos/códigos reais em ds_movimento (rodar query 4.2 do doc de análise,
+-- adaptada para tb_evento_processual) e a condição de "laudo em aberto com prazo válido"
+-- da perícia ativa (tabela de perito/laudo ainda não localizada — ver seção 3 do doc).
 movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
     INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
     INNER JOIN pje.tb_evento e ON e.id_evento = tpe.id_evento
+    INNER JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
     WHERE tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
-        AND fn_soma_dias_uteis(r.dta_audiencia::date, 3) -- TODO(confirmar): função de dias úteis
+        AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
         AND (
-            e.ds_evento ILIKE '%perícia%'          -- TODO(confirmar): + condição de laudo em aberto/prazo válido
-            OR e.ds_evento ILIKE '%expedição de ofício%'
-            OR e.ds_evento ILIKE '%expedição de carta precatória%'
-            OR e.ds_evento ILIKE '%expedição de mandado%'
+            ep.ds_movimento ILIKE '%perícia%'          -- TODO(confirmar): + condição de laudo em aberto/prazo válido
+            OR ep.ds_movimento ILIKE '%expedição de ofício%'
+            OR ep.ds_movimento ILIKE '%expedição de carta precatória%'
+            OR ep.ds_movimento ILIKE '%expedição de mandado%'
         )
 ),
 
@@ -120,18 +163,21 @@ movimentos_diligencia AS (
 movimentos_julgamento AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
         AND tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
-            AND fn_soma_dias_uteis(r.dta_audiencia::date, 3) -- TODO(confirmar)
+            AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
+    LEFT JOIN pje.tb_evento e ON e.id_evento = tpe.id_evento
+    LEFT JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
         AND (
             tpe.ds_texto_final_externo ILIKE 'Conclusos%sentença%'
-            OR tpe.ds_evento ILIKE '%prolação%sentença%'
-            OR tpe.ds_evento ILIKE '%homologação%acordo%'
+            OR ep.ds_movimento ILIKE '%prolação%sentença%'
+            OR ep.ds_movimento ILIKE '%homologação%acordo%'
         )
     LEFT JOIN proxima_audiencia pa ON pa.id_processo_audiencia = r.id_processo_audiencia
         AND pa.id_tipo_audiencia_proxima = 4 -- Julgamento; TODO(confirmar) id real
-        AND pa.dt_marcacao <= fn_soma_dias_uteis(r.dta_audiencia::date, 3)
-    WHERE tpe.id_processo IS NOT NULL OR pa.id_processo_audiencia IS NOT NULL
+        AND pa.dt_marcacao <= cal.limite_3_dias_uteis
+    WHERE ep.id_evento_processual IS NOT NULL OR pa.id_processo_audiencia IS NOT NULL
 ),
 
 classificacao AS (
