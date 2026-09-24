@@ -369,3 +369,117 @@ ORDER BY dt_ano;
 9. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql`
    substituindo os `-- TODO(confirmar)`/`-- TODO(decisão)` restantes e testar contra casos
    reais conhecidos (audiências já classificadas manualmente, se houver).
+
+## 6. Tabela de monitoramento final (à luz da proposta "Governança da Decisão" v8)
+
+A proposta exige que o dado do painel seja **validado** (Etapa 3), **rastreável** (Etapa 4, trilha
+encadeada por hash) e **explicável na origem** (Etapa 5), com registro **por unidade, nunca por
+pessoa**. Isso pede duas tabelas separadas — a trilha não guarda conteúdo processado, só o
+registro técnico da execução:
+
+### 6.1 `fato_audiencia_classificada` — o que o PAI consome (uma linha por audiência e versão de regra)
+
+| Grupo | Coluna | Tipo | Por quê |
+|---|---|---|---|
+| Chave | `id_processo_audiencia` | bigint | Chave natural na origem; com `versao_regra`, forma a PK (permite upsert/reprocessamento) |
+| Chave | `versao_regra` | varchar | Qual regra classificou (ex. `ORIGINAL`, `SETIC-v2`). Permite rodar as duas em paralelo e comparar antes de virar a chave |
+| Identificação | `id_processo`, `nr_processo` | | Já existentes |
+| Identificação | `id_orgao_julgador` | int | Unidade — granularidade de registro exigida pela proposta |
+| Identificação | `dt_audiencia` | timestamp | Já existente |
+| Identificação | `id_tipo_audiencia` | int | Hoje só sai o texto; o id é o que as regras usam |
+| Identificação | `tipo_audiencia` | varchar | Já existente (sem "por videoconferência") |
+| Identificação | `categoria_audiencia` | varchar | `Inicial`/`UNA`/`Instrução` — a unidade das regras novas |
+| Identificação | `rito` | varchar | `Ordinário`/`Sumário`/`Sumaríssimo` — explicita o mapeamento RS |
+| Identificação | `modalidade`, `ds_classe_judicial`, `fase` | | Já existentes |
+| Resultado | `status` | varchar | `Efetiva`/`Adiada` |
+| Resultado | `regra_aplicada` | varchar | Código do ramo que decidiu (ex. `R0_INCOMPETENCIA`, `R1_MESMA_CATEGORIA`, `R3C_BIPARTICAO_INJUSTIFICADA`, `R9_OMISSAO`). É o que torna a classificação verificável, e mede quantos casos caem nas lacunas do documento |
+| Evidência | `id_tipo_audiencia_proxima`, `dt_marcacao_proxima` | | Sinal da regra geral/Inicial/bipartição |
+| Evidência | `fl_diligencia`, `tp_diligencia` | bool, varchar | Ofício/Carta/Mandado/Perícia |
+| Evidência | `fl_encerramento_instrucao`, `fl_julgamento_designado` | bool | |
+| Evidência | `fl_conclusao_sentenca`, `fl_sentenca`, `fl_homologacao_acordo`, `fl_incompetencia` | bool | |
+| Evidência | `dt_limite_janela` | date | 3º dia útil calculado — auditável contra o calendário |
+| Linhagem | `id_execucao` | bigint | FK para a trilha (6.2) — liga cada linha à carga que a produziu |
+| Linhagem | `dt_referencia` | date | Data de apuração (tipo `date`, não texto). Necessária porque "perícia ativa" depende da data em que se roda |
+| Linhagem | `fonte` | varchar | `pje_1grau_cds` |
+
+**Sair ou rever:**
+- `magistrado` (nome) — conflita com o princípio da proposta ("não há métrica individual de
+  magistrado ou de servidor"). Com essa coluna o painel permite ranquear efetividade por juiz.
+  Decisão do usuário.
+- `dt_ult_mov` — sempre `NULL` na original e na v2. Provavelmente existe só para casar com o
+  `UNION` da pauta programada (DW_TRT). Se for isso, manter; senão, remover.
+- `dta_ref` — hoje é texto (`TO_CHAR`); substituir por `dt_referencia` do tipo `date`.
+
+### 6.2 `trilha_execucao` — monitoramento da carga (Etapas 3 e 4; "Log do Placar" do mockup)
+
+| Coluna | Uso |
+|---|---|
+| `id_execucao` | PK |
+| `etapa` | Extração / Classificação / Carga |
+| `versao_regra` | Qual regra rodou |
+| `parametro_ult_dt` | Valor de `VAR_ULT_DT_AUDIENCIA` usado — reprodutibilidade |
+| `dt_inicio`, `dt_fim`, `duracao_seg` | Base do indicador "Tempo Médio de Recuperação" |
+| `status` | Sucesso / Falha / Alerta |
+| `linhas_lidas`, `linhas_gravadas`, `linhas_retidas_janela_aberta` | Validação de volume |
+| `qtd_efetiva`, `qtd_adiada`, `qtd_regra_omissao` | Placar; desvio contra a média histórica vira alerta |
+| `pct_desvio_volume` | Desvio contra as últimas N execuções |
+| `id_execucao_reprocessada` | Liga a reexecução à falha — permite medir o tempo de recuperação |
+| `fl_intervencao_humana`, `unidade_intervencao`, `motivo_intervencao` | Exigidos pela proposta; unidade, não pessoa |
+| `hash_log`, `hash_anterior` | Encadeamento — alterar um registro rompe a cadeia |
+
+Validações sugeridas para `status = Alerta`: volume fora de ±X% da média; `qtd_regra_omissao`
+acima de um limiar; qualquer `dt_limite_janela` nulo; proporção Efetiva/Adiada fora da faixa
+histórica.
+
+## 7. Reavaliação completa (após a proposta v8)
+
+**Corrigido nesta revisão (bugs técnicos):**
+1. O calendário só bloqueava o **dia inicial** de cada evento — `tb_calendario_eventos` tem
+   `dt_dia_final`/`dt_mes_final`/`dt_ano_final` para períodos (recesso 20/12–20/01). Agora bloqueia o
+   intervalo.
+2. A busca de dias úteis ia só até +15 dias — insuficiente no recesso (limite vinha `NULL`, a
+   audiência virava Adiada por falta de sinais). Agora +60 dias, e limite `NULL` não é
+   classificado.
+3. O buffer fixo de 10 dias classificava audiências antes de a janela fechar (ex.: audiência em
+   19/12, janela fecha ~23/01). Agora só classifica quando `dt_limite_janela < CURRENT_DATE`.
+4. `in_ativo`/`in_suspende_prazo` são do domínio `pje."boleano"`; comparar com `'S'` quebra se
+   o tipo base for boolean. Comparação feita via `::text`, que funciona nos dois casos.
+
+**Achados que precisam de decisão:**
+5. **Crítico — UNA/Inicial sem audiência subsequente viram Adiada.** Todos os ramos da UNA exigem
+   que a próxima audiência seja Instrução; a Inicial exige alguma próxima audiência. Uma UNA que
+   termina com sentença ou acordo (o melhor desfecho possível) ou uma Inicial com acordo
+   homologado não têm próxima audiência e caem no `ELSE 'Adiada'`. A query original classificava
+   esses casos como Efetiva. É uma regressão da v2 — ver pergunta 1 da lista em 7.1.
+6. **A query original já tratava sentença terminativa como efetiva.** O filtro
+   `ds_caminho_completo ILIKE 'Magistrado|Julgamento%'` cobre toda a subárvore Julgamento da TPU
+   — mérito (219/220/221), terminativas (456–465, 454), arquivamento por ausência do reclamante
+   (473), homologação de transação (466). Os ids 941/371 foram somados à parte justamente por
+   ficarem fora dessa subárvore (Magistrado > Decisão > Declaração). Evidência forte para a
+   pergunta de sentença terminativa.
+7. **"Perícia ativa" é avaliada no estado atual, não no da janela.** `cd_status_pericia` e
+   `id_proc_parte_exp_ultimo` são o estado de hoje: uma perícia marcada na janela com laudo já
+   entregue na data da carga deixa de contar e pode virar Adiada. Reprocessar mais tarde muda o
+   resultado — por isso `dt_referencia` na tabela.
+8. **"Inicial → qualquer subsequente"** hoje aceita qualquer tipo (inclusive Conciliação,
+   Mediação); o documento lista quatro (UNA, Instrução, Encerramento, Julgamento).
+9. **Audiências canceladas** entram em `audiencias_subsequentes` (não há filtro por
+   `cd_status_audiencia`). A original também não filtrava.
+
+### 7.1 Lista consolidada para o chamado (substitui as anteriores)
+
+1. **UNA e Inicial sem nova audiência** — UNA sem redesignação e sem bipartição, mas com sentença
+   ou acordo; Inicial com acordo homologado ou arquivamento — são Efetivas? (A original as marcava
+   Efetivas; a v2, pela letra do documento, as marca Adiadas.)
+2. **UNA seguida de tipo que não é UNA nem Instrução** (Encerramento ou Julgamento direto).
+3. **Instrução sem diligência e sem Julgamento designado** — Adiada por analogia com a UNA?
+4. **Tipo 8 "Instrução e Julgamento"** — segue a árvore da Instrução ou regra própria?
+5. **Sentença terminativa** conta como "prolação de sentença"? (A original contava — item 6.)
+6. **Perícia ativa: avaliada em que momento?** No fim da janela de 3 dias úteis (determinístico)
+   ou na data de apuração (como hoje)? E precisa ter sido marcada dentro da janela?
+7. **"Qualquer audiência subsequente" da Inicial** — só os quatro tipos listados ou qualquer tipo?
+8. **Dias úteis — abrangência municipal** entra no cálculo?
+9. *(informativo)* ids 7/9 "RS" foram tratados como Rito Sumário (UNA) por inferência — confirmar.
+
+**Decisões internas (não são para a SETIC):** manter ou retirar `magistrado`; manter
+`dt_ult_mov` só se o UNION da pauta programada exigir; adotar o reprocessamento com sobra + upsert.

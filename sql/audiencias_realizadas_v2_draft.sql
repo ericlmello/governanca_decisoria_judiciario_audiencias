@@ -38,6 +38,13 @@
  *      seguinte (proxima_audiencia, LIMIT 1) — mas na bipartição UNA->Instrução, o Julgamento
  *      normalmente vem DEPOIS da Instrução, não é "a próxima" em relação à UNA original. Corrigido
  *      com a nova CTE audiencias_subsequentes (todas as audiências futuras, não só a 1ª).
+ *   f) Calendário: eventos com período (recesso) só bloqueavam o dia inicial; busca limitada a
+ *      +15 dias; buffer fixo de 10 dias classificava antes de a janela fechar; comparação com 'S'
+ *      em colunas pje."boleano". Todos corrigidos (ver calendario_3du e o WHERE final).
+ *
+ * CRÍTICO, pendente de decisão: UNA sem nova audiência (terminou com sentença/acordo) e Inicial
+ * com acordo homologado caem no ELSE 'Adiada' — a query original as marcava Efetivas. Ver
+ * docs/analise_criterios_audiencias_setic.md, seção 7.
  *
  * LACUNAS NO PRÓPRIO DOCUMENTO (não são bug do rascunho — o texto simplesmente não cobre estes
  * casos; caem no ELSE 'Adiada' por omissão, mas merecem confirmação da SETIC):
@@ -157,11 +164,15 @@ audiencias_realizadas AS (
         AND tpa.id_tipo_audiencia = ANY (p.tipo_inicial || p.tipo_una || p.tipo_instrucao)
         AND tpt.cd_processo_status = 'D'
         AND date_trunc('day', tpa.dt_inicio) > '${VAR_ULT_DT_AUDIENCIA}'
-        -- TODO(confirmar): buffer de segurança para a janela de 3 dias úteis fechar antes da
-        -- audiência entrar no resultado. 10 dias corridos cobre folgadamente 3 dias úteis mesmo
-        -- com fim de semana + 1 feriado no meio; ajustar depois que o cálculo real de dias
-        -- úteis (CTE calendario_3du abaixo) estiver validado.
-        and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 10)
+        -- Pré-filtro barato: 3 dias úteis exigem no mínimo 3 dias corridos. O corte real (janela
+        -- já fechada) é feito no SELECT final, sobre calendario_3du.limite_3_dias_uteis — o antigo
+        -- buffer fixo de 10 dias classificava cedo demais audiências perto do recesso forense.
+        -- TODO(confirmar): como o limite varia por vara (calendário local), duas audiências do
+        -- mesmo dia podem fechar a janela em datas diferentes; com carga incremental "> última
+        -- data carregada", a que fecha depois seria pulada. Recomendado: reprocessar uma sobra
+        -- (ex.: VAR_ULT_DT_AUDIENCIA - 45 dias) com gravação por upsert na chave
+        -- (id_processo_audiencia, versao_regra) — ver docs/analise, seção 6.
+        and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 4)
 ),
 
 -- TODAS as audiências subsequentes (não só a próxima) designadas para o mesmo processo após a
@@ -202,6 +213,12 @@ proxima_audiencia AS (
 -- + estado de SP). Se um registro do calendário suspender audiência/prazo só num município
 -- específico (não no estado inteiro), esse dia deve contar como não-útil apenas para as varas
 -- daquele município, ou nacional+estadual já é suficiente?
+-- Eventos com período (dt_*_final preenchido, ex.: recesso forense 20/12 a 20/01) bloqueiam o
+-- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
+-- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
+-- funciona tanto se for boolean ('true') quanto char ('S').
+-- TODO(confirmar): existem registros com dt_ano NULL (feriado fixo recorrente)? Se sim, hoje
+-- eles são ignorados — rodar: SELECT COUNT(*) FROM pje.tb_calendario_eventos WHERE dt_ano IS NULL;
 calendario_3du AS (
     SELECT
         r.id_processo_audiencia,
@@ -211,18 +228,21 @@ calendario_3du AS (
                 SELECT dia, ROW_NUMBER() OVER (ORDER BY dia) AS rn
                 FROM generate_series(
                     r.dta_audiencia::date + INTERVAL '1 day',
-                    r.dta_audiencia::date + INTERVAL '15 day',
+                    r.dta_audiencia::date + INTERVAL '60 day',
                     INTERVAL '1 day'
                 ) AS dia
                 WHERE EXTRACT(DOW FROM dia) NOT IN (0, 6)  -- exclui sáb/dom
                   AND NOT EXISTS (
                       SELECT 1
                       FROM pje.tb_calendario_eventos ce
-                      WHERE ce.in_ativo = 'S'
-                        AND (ce.in_suspende_prazo = 'S' OR ce.in_suspende_audiencia = 'S')
+                      WHERE ce.in_ativo::text IN ('S', 'true')
+                        AND (ce.in_suspende_prazo::text IN ('S', 'true') OR ce.in_suspende_audiencia = 'S')
                         AND (ce.id_orgao_julgador IS NULL OR ce.id_orgao_julgador = r.id_orgao_julgador)
                         AND (ce.id_estado IS NULL OR ce.id_estado = 26) -- SP
-                        AND make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia) = dia::date
+                        AND dia::date BETWEEN make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia)
+                            AND make_date(COALESCE(ce.dt_ano_final, ce.dt_ano),
+                                          COALESCE(ce.dt_mes_final, ce.dt_mes),
+                                          COALESCE(ce.dt_dia_final, ce.dt_dia))
                   )
             ) dias_uteis
             WHERE dias_uteis.rn = 3
@@ -430,20 +450,24 @@ classificacao AS (
     LEFT JOIN incompetencia_na_janela inc ON inc.id_processo_audiencia = r.id_processo_audiencia
 )
 SELECT
-    nr_processo, id_processo,
-    id_orgao_julgador,
-    dta_audiencia dt_audiencia,
-    replace(ds_tipo_audiencia, ' por videoconferência', '') tipo_audiencia,
+    c.nr_processo, c.id_processo,
+    c.id_orgao_julgador,
+    c.dta_audiencia dt_audiencia,
+    replace(c.ds_tipo_audiencia, ' por videoconferência', '') tipo_audiencia,
     case
-        when STRPOS(ds_tipo_audiencia, ' por videoconferência') > 0 then
+        when STRPOS(c.ds_tipo_audiencia, ' por videoconferência') > 0 then
             'Videoconferência'
         else
             'Presencial'
     end modalidade,
-    ds_classe_judicial,
-    magistrado,
-    status,
-    fase,
+    c.ds_classe_judicial,
+    c.magistrado,
+    c.status,
+    c.fase,
     NULL::date AS dt_ult_mov,
     TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD') AS dta_ref
-FROM classificacao;
+FROM classificacao c
+INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = c.id_processo_audiencia
+-- Só classifica quando a janela de 3 dias úteis já fechou. limite NULL (mais de 60 dias sem dia
+-- útil) também fica de fora, em vez de virar "Adiada" por falta de sinais.
+WHERE cal.limite_3_dias_uteis < CURRENT_DATE;
