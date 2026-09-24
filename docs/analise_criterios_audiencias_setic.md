@@ -466,6 +466,43 @@ histórica.
 9. **Audiências canceladas** entram em `audiencias_subsequentes` (não há filtro por
    `cd_status_audiencia`). A original também não filtrava.
 
+## 7.0 `VAR_ULT_DT_AUDIENCIA` é autorreferente (confirmado pelo usuário)
+
+O usuário confirmou a origem da variável:
+
+```sql
+-- maior data de audiência excluindo as programadas
+SELECT MAX(dt_audiencia) AS ultima_dt
+FROM pai_2_0.audiencias
+WHERE status <> 'Programada'
+```
+
+Ou seja, o watermark é lido **da própria tabela de destino** (`pai_2_0.audiencias`) que a carga
+grava — não é um parâmetro externo independente. Isso confirma, na prática, o risco já
+sinalizado como `TODO(confirmar)` na query (linha ~166 de
+`sql/audiencias_realizadas_v2_draft.sql`):
+
+- Como o limite de 3 dias úteis varia por vara/calendário local, duas audiências do **mesmo dia**
+  podem ter suas janelas fechando em datas diferentes.
+- Assim que **qualquer** audiência com `dt_audiencia` de um certo dia (ou posterior) for gravada
+  em `pai_2_0.audiencias`, o `MAX(dt_audiencia)` avança e o filtro `dt_inicio > ultima_dt`
+  **exclui permanentemente** qualquer outra audiência daquele mesmo dia (ou de dias anteriores a
+  esse máximo) que ainda não tenha sido processada — mesmo que sua janela de 3 dias úteis só
+  feche depois.
+- Não há reprocessamento: uma vez que o `MAX` passa por uma data, ela nunca mais entra no filtro
+  `>`.
+
+**Consequência prática:** carga com esse padrão de watermark autorreferente tende a **perder
+audiências silenciosamente** (não gera erro, só nunca aparecem no resultado), especialmente perto
+de janelas divergentes entre varas (recesso forense afeta comarcas/varas de forma não uniforme).
+
+**Recomendação já registrada na query:** trocar o corte exato por uma **sobra de segurança** (ex.:
+`MAX(dt_audiencia) - 45 dias`, não o valor exato do `MAX`) combinada com **upsert** na chave
+`(id_processo_audiencia, versao_regra)` — assim reprocessar um período que já tem linhas
+gravadas apenas atualiza (não duplica), e audiências "esquecidas" voltam a ser avaliadas a cada
+carga. Ver tabela de monitoramento (seção 6.2, coluna `parametro_ult_dt` — guardar o valor usado
+em cada execução também ajuda a auditar esse tipo de perda).
+
 ### 7.1 Lista consolidada para o chamado (substitui as anteriores)
 
 1. **UNA e Inicial sem nova audiência** — UNA sem redesignação e sem bipartição, mas com sentença

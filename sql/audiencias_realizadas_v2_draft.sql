@@ -164,14 +164,23 @@ audiencias_realizadas AS (
         AND tpa.id_tipo_audiencia = ANY (p.tipo_inicial || p.tipo_una || p.tipo_instrucao)
         AND tpt.cd_processo_status = 'D'
         AND date_trunc('day', tpa.dt_inicio) > '${VAR_ULT_DT_AUDIENCIA}'
+        -- VAR_ULT_DT_AUDIENCIA vem da própria tabela de destino (marca d'água/watermark):
+        --   SELECT MAX(dt_audiencia) AS ultima_dt
+        --   FROM pai_2_0.audiencias
+        --   WHERE status <> 'Programada'
+        -- Ou seja, é AUTORREFERENTE: a query lê da mesma tabela em que grava. Isso reforça o
+        -- TODO(confirmar) abaixo — não é só uma variação teórica, é o padrão de carga real.
+        --
         -- Pré-filtro barato: 3 dias úteis exigem no mínimo 3 dias corridos. O corte real (janela
         -- já fechada) é feito no SELECT final, sobre calendario_3du.limite_3_dias_uteis — o antigo
         -- buffer fixo de 10 dias classificava cedo demais audiências perto do recesso forense.
         -- TODO(confirmar): como o limite varia por vara (calendário local), duas audiências do
-        -- mesmo dia podem fechar a janela em datas diferentes; com carga incremental "> última
-        -- data carregada", a que fecha depois seria pulada. Recomendado: reprocessar uma sobra
-        -- (ex.: VAR_ULT_DT_AUDIENCIA - 45 dias) com gravação por upsert na chave
-        -- (id_processo_audiencia, versao_regra) — ver docs/analise, seção 6.
+        -- mesmo dia podem fechar a janela em datas diferentes. Com o watermark acima (MAX(dt_audiencia)
+        -- já gravado), uma audiência cuja janela fecha depois de outra do mesmo dia pode nunca
+        -- ser reprocessada, pois `dt_inicio > ultima_dt` a exclui permanentemente assim que
+        -- QUALQUER audiência daquele dia (ou depois) for gravada primeiro. Recomendado: usar uma
+        -- sobra de segurança (ex.: MAX(dt_audiencia) - 45 dias, não o valor exato) com gravação
+        -- por upsert na chave (id_processo_audiencia, versao_regra) — ver docs/analise, seção 6.
         and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 4)
 ),
 
