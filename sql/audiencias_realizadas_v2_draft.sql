@@ -51,10 +51,17 @@
  *
  * Mapeamento de pje.tb_tipo_audiencia confirmado pelo usuário (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
- *   UNA .......................... 5, 19 (sumaríssimo), 23 (videoconf), 31 (videoconf sumaríssimo)
+ *   UNA .......................... 5, 19 (sumaríssimo), 23 (videoconf), 31 (videoconf sumaríssimo),
+ *                                  7 (RS ou Justificação Prévia), 9 (RS)
  *   Instrução .................... 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo)
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
+ *
+ * DECIDIDO pelo usuário: ids 7 ("UNA-RS ou Justificação Prévia") e 9 ("Una - RS") entram no
+ * grupo UNA, com base na hipótese de que "RS" = "Rito Sumário" (terceiro rito trabalhista,
+ * CLT/Lei 5.584/70, distinto do sumaríssimo já mapeado). Não confirmado contra o banco — se
+ * "RS" significar outra coisa, ou se o "ou Justificação Prévia" do id 7 for relevante em algum
+ * caso, revisar este mapeamento.
  *
  * DECIDIDO pelo usuário: tipos totalmente fora do documento (Conciliação em Conhecimento
  * (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
@@ -63,14 +70,10 @@
  * audiencias_realizadas só inclui tipo_inicial/tipo_una/tipo_instrucao) — nenhuma mudança
  * necessária.
  *
- * TODO(decisão) — ainda pendentes:
+ * TODO(decisão) — ainda pendente:
  *   - 8  Instrução e Julgamento (audiência única que já conclui com julgamento — segue a
  *        árvore da Instrução (seção 2.4), ou tem regra própria já que não depende de sinal
  *        posterior? Ver árvore detalhada na conversa/seção 2 do doc de análise.)
- *   - 7  UNA-RS ou Justificação Prévia / 9 Una - RS — hipótese (não confirmada): "RS" =
- *        "Rito Sumário", o terceiro rito trabalhista (CLT/Lei 5.584/70), distinto do
- *        sumaríssimo (Lei 9.957/2000) já mapeado acima. Se confirmado, esses ids entrariam no
- *        grupo tipo_una. Ainda não aplicado — aguardando confirmação antes de alterar o array.
  *
  * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) confirmados pelo usuário:
  *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
@@ -104,11 +107,11 @@
 
 WITH parametros AS (
     SELECT
-        ARRAY[3, 16, 22, 29]   AS tipo_inicial,
-        ARRAY[5, 19, 23, 31]   AS tipo_una,
-        ARRAY[6, 12, 24, 27]   AS tipo_instrucao,
-        ARRAY[10, 25]          AS tipo_encerramento_instrucao,
-        ARRAY[4]               AS tipo_julgamento
+        ARRAY[3, 16, 22, 29]       AS tipo_inicial,
+        ARRAY[5, 19, 23, 31, 7, 9] AS tipo_una, -- 7/9 = RS (Rito Sumário, hipótese não confirmada)
+        ARRAY[6, 12, 24, 27]       AS tipo_instrucao,
+        ARRAY[10, 25]              AS tipo_encerramento_instrucao,
+        ARRAY[4]                   AS tipo_julgamento
 ),
 
 audiencias_realizadas AS (

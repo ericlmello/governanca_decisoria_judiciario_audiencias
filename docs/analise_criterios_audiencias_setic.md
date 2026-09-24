@@ -21,7 +21,7 @@ documento:
 | Categoria (documento) | ids |
 |---|---|
 | Inicial | 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo) |
-| UNA | 5, 19 (sumaríssimo), 23 (videoconf), 31 (videoconf sumaríssimo) |
+| UNA | 5, 19 (sumaríssimo), 23 (videoconf), 31 (videoconf sumaríssimo), **7 (RS ou Justificação Prévia), 9 (RS)** |
 | Instrução | 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo) |
 | Encerramento de Instrução | 10, 25 (videoconf) |
 | Julgamento | 4 (confirma o que a query original já assumia) |
@@ -31,15 +31,18 @@ documento:
 juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública (17, 30))
 **ficam de fora** da população avaliada. Já implementado assim.
 
-**Ainda pendentes:**
+**Decidido pelo usuário:** ids `7` ("UNA-RS ou Justificação Prévia") e `9` ("Una - RS") entram
+no grupo **UNA**, com base na hipótese de que "RS" = "Rito Sumário" (terceiro rito trabalhista,
+distinto do sumaríssimo já mapeado). **Não confirmado contra o banco** — é uma inferência de
+direito do trabalho, não uma verificação de dado; se "RS" significar outra coisa, ou o "ou
+Justificação Prévia" do id `7` for relevante nalgum caso, revisar. Já aplicado no array
+`tipo_una` da CTE `parametros`.
+
+**Ainda pendente:**
 
 - `8` Instrução e Julgamento — segue a árvore da Instrução (seção 2.4 — diligência+Encerramento
   de Instrução → Efetiva; sem diligência+Julgamento → Efetiva; regra geral de mesma categoria
   se redesignada; caso contrário Adiada por omissão), ou tem regra própria?
-- `7` UNA-RS ou Justificação Prévia / `9` Una - RS — hipótese levantada (não confirmada): "RS"
-  pode ser "Rito Sumário", o terceiro rito trabalhista (CLT/Lei 5.584/70), distinto do
-  sumaríssimo (Lei 9.957/2000, já mapeado acima em UNA). Se confirmado, esses ids entrariam no
-  grupo UNA. Ainda não aplicado no rascunho — aguardando confirmação.
 
 ## 1. Resumo da lógica atual (query original)
 
@@ -342,12 +345,12 @@ ORDER BY dt_ano;
    máxima (CTE `incompetencia_na_janela`), ver seção 3.2.
 3.5 ~~Janela de 3 dias úteis aplicada só onde o documento determina~~ — decidido: Regra Geral e
    Inicial não têm janela; já implementado assim (nenhuma mudança necessária).
+3.6 ~~`7`/`9` "...RS"~~ — decidido: entram no grupo UNA (hipótese "Rito Sumário", não confirmada
+   contra o banco), já aplicado no array `tipo_una`.
 
 **Ainda pendente:**
 4. `8` "Instrução e Julgamento" — segue a árvore da Instrução (detalhada na conversa) ou tem
    regra própria?
-4.1 `7`/`9` "...RS" — hipótese levantada (Rito Sumário, ver seção 0) ainda não confirmada nem
-   aplicada no rascunho.
 4.2 Duas lacunas do próprio documento, achadas na releitura (seção 3.4, itens d/e): o que
    acontece com UNA seguida de um tipo que não é UNA nem Instrução; e qual o status da Instrução
    quando nem diligência+Encerramento nem sem-diligência+Julgamento se aplicam.
