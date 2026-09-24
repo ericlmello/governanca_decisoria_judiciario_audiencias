@@ -141,12 +141,36 @@ O usuário indicou duas tabelas que resolvem parte das divergências 4 e 5 da se
 
 Ainda **não confirmado**:
 
-- Textos reais de `ds_movimento` para cada um dos 8 movimentos monitorados (seção 2.5) —
-  a query 4.2 abaixo foi adaptada para `tb_evento_processual`, mas os padrões `ILIKE` ainda são
-  chute por convenção de nomenclatura, não confirmados.
-- Se "Marcação de audiência de julgamento" deve ser detectada como movimento em
-  `tb_evento_processual` ou apenas como novo registro em `tb_processo_audiencia` com
-  `id_tipo_audiencia` = Julgamento (o rascunho hoje usa a segunda via, igual à query original).
+- Se "Marcação de audiência de julgamento" deve ser detectada como movimento ou apenas como
+  novo registro em `tb_processo_audiencia` com `id_tipo_audiencia` = Julgamento (o rascunho hoje
+  usa a segunda via, igual à query original).
+- Se existe tabela de complemento/parâmetro estruturada para "tipo de documento" expedido
+  (mais robusta que `ILIKE` em texto livre — ver seção 3.2).
+- A tabela de perito/laudo para a condição de "perícia ativa" (query 4.4, ainda não rodada).
+
+## 3.2 Códigos de movimento confirmados (amostra de `tb_evento_processual`)
+
+O usuário devolveu uma amostra grande de `tb_evento_processual (id_evento_processual, cd_evento,
+ds_movimento)`. Como `ds_movimento` é o texto de **catálogo** e mantém os placeholders
+(`#{tipo de documento}`, `#{nome da parte}` etc.), a forma robusta de identificar cada movimento
+passou a ser o código numérico (`tpe.id_evento`, que corresponde a `id_evento_processual`), e não
+mais `ILIKE` no catálogo:
+
+| Movimento (documento) | Código(s) confirmados | Observação |
+|---|---|---|
+| Conclusão para sentença | `51` | "Conclusos os autos para #{tipo de conclusão}..." — mesma lógica da query original: `ds_texto_final_externo ILIKE '%sentença%'` sobre o texto **resolvido**, já que o tipo de conclusão é parâmetro |
+| Prolação de sentença | `219, 220, 221, 50110, 50118` | Não existe um movimento literal "Prolação de sentença"; o julgamento de mérito em 1º grau aparece como resultado específico (procedente/improcedente/procedente em parte/julgado antecipadamente/liminarmente improcedente) |
+| Homologação de acordo | `466` | Não existe texto literal "Homologação de acordo"; o termo técnico trabalhista é "transação" — `466 Homologada a transação (Valor da transação: ...)` |
+| Expedição de ofício / carta precatória / mandado | `60` (mesmo código para os três) | "Expedido(a) #{tipo de documento} a(o) #{destinatário}" — os três tipos são a MESMA movimentação genérica; só dá pra diferenciar pelo texto resolvido (`ds_texto_final_externo ILIKE '%Ofício%'` / `'%Carta Precatória%'` / `'%Mandado%'`) |
+| Perícia ativa | — | Nenhum movimento correspondente na amostra. Confirma que depende de tabela de perito/laudo à parte, ainda não localizada |
+
+**Achado extra, sobre a query ORIGINAL (não o rascunho):** os ids `941` e `371`, usados nela
+como sinal adicional de "Efetiva" (`OR e.id_evento IN (941, 371)`), correspondem — pela mesma
+amostra — a `941 = "Declarada a incompetência"` e `371 = "Acolhida a exceção de incompetência"`.
+Não têm relação direta com sentença/julgamento. Pode ser intencional (processo resolvido/
+remetido por incompetência também conta como audiência que cumpriu seu papel), mas **vale
+confirmar com a SETIC** antes de decidir se esse sinal é replicado na v2 — por ora, o rascunho
+não o inclui.
 
 ## 4. Queries de descoberta (rodar contra `pje_1grau_cds` quando houver acesso)
 
@@ -158,18 +182,19 @@ SELECT id_tipo_audiencia, ds_tipo_audiencia
 FROM pje.tb_tipo_audiencia
 ORDER BY 1;
 
--- 4.2 Movimentos candidatos aos "movimentos monitorados" (ajustar termos de busca)
--- Usa tb_evento_processual.ds_movimento (indicado pelo usuário como fonte mais confiável
--- que tb_evento.ds_evento), cruzando com tb_evento só para trazer o id_evento/caminho.
-SELECT e.id_evento, e.ds_evento, e.ds_caminho_completo, ep.ds_movimento
-FROM pje.tb_evento e
-INNER JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
-WHERE ep.ds_movimento ILIKE ANY (ARRAY[
-    '%perícia%', '%pericia%', '%ofício%', '%oficio%', '%carta precatória%',
-    '%carta precatoria%', '%mandado%', '%conclus%sentença%', '%conclus%sentenca%',
-    '%prolação%sentença%', '%prolacao%sentenca%', '%homologa%acordo%'
-])
-ORDER BY ep.ds_movimento;
+-- 4.2 [RESOLVIDA] Códigos de movimento confirmados via amostra de tb_evento_processual — ver
+-- tabela na seção 3.2. Query mantida aqui só para conferência pontual de um código específico:
+SELECT id_evento_processual, cd_evento, ds_movimento
+FROM pje.tb_evento_processual
+WHERE id_evento_processual IN (51, 60, 219, 220, 221, 466, 941, 371, 50110, 50118);
+
+-- 4.2.2 Localizar tabela de complemento que guarde o "tipo de documento" expedido de forma
+-- estruturada (ofício/carta precatória/mandado), como alternativa ao ILIKE em texto livre
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'pje'
+  AND table_name ILIKE '%processo_evento%'
+  AND (column_name ILIKE '%tipo%doc%' OR column_name ILIKE '%complement%');
 
 -- 4.2.1 Amostra de tb_calendario_eventos para entender os flags de dia útil/feriado
 -- (in_feriado x in_suspende_prazo x in_suspende_audiencia) e o alcance de
@@ -181,10 +206,8 @@ WHERE in_ativo = 'S'
 ORDER BY dt_mes, dt_dia
 LIMIT 100;
 
--- 4.3 Confirmar os ids já usados na query original (941, 371)
-SELECT id_evento, ds_evento, ds_caminho_completo
-FROM pje.tb_evento
-WHERE id_evento IN (941, 371);
+-- 4.3 [RESOLVIDA pela query 4.2] ids 941/371 da query original = "Declarada a incompetência" /
+-- "Acolhida a exceção de incompetência" — ver achado extra na seção 3.2.
 
 -- 4.4 Verificar se existe controle de perícia (perito/laudo) e onde fica o status/prazo
 SELECT table_name, column_name, data_type
@@ -205,21 +228,29 @@ ORDER BY dt_ano;
 
 ## 5. Próximos passos sugeridos
 
-1. ~~Definir como calcular "3 dias úteis"~~ — **resolvido**: `tb_calendario_eventos` +
-   `generate_series`, implementado na CTE `calendario_3du` do rascunho v2. Regra: dia útil =
-   `in_suspende_prazo <> 'S'` e `in_suspende_audiencia <> 'S'`; abrangência nacional ou
-   estado de SP (`id_estado = 26`). Falta rodar a query 4.5 pra validar o resultado contra
-   casos reais conhecidos.
-2. ~~Rodar a query 4.1~~ — **resolvido**: ver seção 0. `id_tipo_audiencia` de Inicial, UNA,
-   Instrução, Encerramento de Instrução e Julgamento confirmados e já aplicados no rascunho v2
-   via a CTE `parametros`.
-3. Decidir os itens ambíguos/fora do documento listados na seção 0 (tipo 8 "Instrução e
-   Julgamento"; tipos 7/9 "...RS"; e o bloco Conciliação/Mediação/Pública/Inquirição/
-   Justificação Prévia, hoje fora da população avaliada).
-4. Rodar a query 4.2 e devolver o resultado para eu confirmar os textos/padrões reais de
-   `ds_movimento` dos 8 movimentos monitorados.
-5. Decidir o tratamento de perícia com prazo vencido: buscar/replicar a regra do "painel de
-   perícias do PAI" ou tratar como fora de escopo desta query. Ainda depende de localizar a(s)
-   tabela(s) de perito/laudo (query 4.4).
-6. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql` (rascunho
-   incluído neste PR) substituindo os `-- TODO(confirmar)`/`-- TODO(decisão)` restantes.
+**Resolvido:**
+1. ~~Definir como calcular "3 dias úteis"~~ — `tb_calendario_eventos` + `generate_series`,
+   implementado na CTE `calendario_3du`. Regra: dia útil = `in_suspende_prazo <> 'S'` e
+   `in_suspende_audiencia <> 'S'`; abrangência nacional ou estado de SP (`id_estado = 26`).
+2. ~~`id_tipo_audiencia` de Inicial/UNA/Instrução/Encerramento de Instrução/Julgamento~~ — ver
+   seção 0, aplicados na CTE `parametros`.
+3. ~~Códigos dos 8 movimentos monitorados~~ — ver seção 3.2, aplicados nas CTEs
+   `movimentos_diligencia`/`movimentos_julgamento`.
+
+**Ainda pendente:**
+4. Decidir os itens ambíguos/fora do documento (seção 0): tipo `8` "Instrução e Julgamento";
+   tipos `7`/`9` "...RS"; e o bloco Conciliação/Mediação/Pública/Inquirição/Justificação Prévia
+   — hoje fora da população avaliada.
+5. Confirmar com a SETIC se os ids `941`/`371` da query **original** (achado da seção 3.2) devem
+   ser replicados na v2 como sinal de efetividade.
+6. Rodar a query 4.5 para validar a regra de dia útil contra a contagem real de dias não-úteis
+   por ano.
+7. Localizar a tabela de perito/laudo para a condição de "perícia ativa" (query 4.4) e decidir o
+   tratamento de perícia com prazo vencido (painel de perícias do PAI, fora de escopo, ou
+   replicado aqui).
+8. Rodar a query 4.2.2 para checar se existe uma tabela de complemento estruturada para "tipo de
+   documento" expedido (alternativa mais robusta ao `ILIKE` em `ds_texto_final_externo` usado
+   hoje para diferenciar ofício/carta precatória/mandado, todos sob o código `60`).
+9. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql`
+   substituindo os `-- TODO(confirmar)`/`-- TODO(decisão)` restantes e testar contra casos
+   reais conhecidos (audiências já classificadas manualmente, se houver).

@@ -38,6 +38,22 @@
  *     juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28),
  *     Pública (17, 30). Ficam fora da população avaliada (WHERE) até decisão do usuário
  *     sobre se entram e com qual regra.
+ *
+ * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) confirmados pelo usuário:
+ *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
+ *   Prolação de sentença ......... 219, 220, 221, 50110, 50118 (julgamento de mérito, 1º grau)
+ *   Homologação de acordo ........ 466 (Homologada a transação)
+ *   Expedição ofício/carta precatória/mandado .. 60 (+ ds_texto_final_externo ILIKE por tipo)
+ *   Perícia ativa ................ NENHUM movimento correspondente encontrado; depende de
+ *                                  tabela de perito/laudo ainda não localizada (query 4.4)
+ *
+ * ATENÇÃO — achado na query ORIGINAL (não só neste rascunho): os ids 941 e 371 que ela usa
+ * como sinal extra de "Efetiva" (`OR e.id_evento IN (941, 371)`) correspondem, pela mesma
+ * amostra, a "Declarada a incompetência" (941) e "Acolhida a exceção de incompetência" (371)
+ * — nada relacionado a sentença/julgamento. Pode ser intencional (processo resolvido/remetido
+ * por incompetência também conta como audiência que cumpriu seu papel), mas vale confirmar
+ * com a SETIC antes de decidir se esse sinal entra ou não na v2. Não incluído no rascunho
+ * abaixo até essa confirmação.
  */
 
 WITH parametros AS (
@@ -153,28 +169,44 @@ calendario_3du AS (
 
 -- Movimentos de diligência (perícia ativa, ofício, carta precatória, mandado)
 -- em até 3 dias úteis após a audiência.
--- TODO(confirmar): textos/códigos reais em ds_movimento (rodar query 4.2 do doc de análise)
--- e a condição de "laudo em aberto com prazo válido" da perícia ativa (tabela de
--- perito/laudo ainda não localizada — ver seção 3 do doc).
+-- Achado (amostra de tb_evento_processual devolvida pelo usuário): ofício, carta precatória
+-- e mandado são todos instâncias do MESMO movimento genérico da TPU/CNJ
+-- "60 Expedido(a) #{tipo de documento} a(o) #{destinatário}" — o tipo real só existe no texto
+-- resolvido (tpe.ds_texto_final_externo), não no catálogo (ds_movimento mantém o placeholder).
+-- Por isso o filtro usa o código 60 + ILIKE no texto final, e não mais join com
+-- tb_evento/tb_evento_processual.
+-- TODO(confirmar): existe tabela de complemento/parâmetro estruturada para "tipo de
+-- documento" (mais robusta que ILIKE em texto livre)? Não localizada na amostra devolvida.
+-- TODO(confirmar): perícia ativa segue sem correspondência no catálogo de movimentos — não
+-- há nenhum "#{...perícia...}" na amostra. Depende da tabela de perito/laudo (condição
+-- "status != finalizado" + "prazo válido/não vencido"), ainda não localizada (query 4.4).
 movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
     INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
     INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
-    INNER JOIN pje.tb_evento e ON e.id_evento = tpe.id_evento
-    INNER JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
     WHERE tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
         AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
-        AND (
-            ep.ds_movimento ILIKE '%perícia%'          -- TODO(confirmar): + condição de laudo em aberto/prazo válido
-            OR ep.ds_movimento ILIKE '%expedição de ofício%'
-            OR ep.ds_movimento ILIKE '%expedição de carta precatória%'
-            OR ep.ds_movimento ILIKE '%expedição de mandado%'
-        )
+        AND tpe.id_evento = 60 -- Expedido(a) #{tipo de documento} a(o) #{destinatário}
+        AND tpe.ds_texto_final_externo ILIKE ANY (ARRAY[
+            '%Ofício%', '%Carta Precatória%', '%Mandado%'
+        ])
 ),
 
 -- Movimentos de encerramento (conclusão/prolação de sentença, homologação de
 -- acordo, marcação de julgamento) em até 3 dias úteis.
+-- Achados (mesma amostra):
+--   - Conclusão para sentença: código 51 "Conclusos os autos para #{tipo de conclusão}...",
+--     igual à lógica já usada na query original (texto resolvido contendo "sentença").
+--   - Prolação de sentença: não existe como movimento literal; o julgamento de mérito em
+--     1º grau aparece como resultado específico — códigos 219 (procedente), 220
+--     (improcedente), 221 (procedente em parte), 50110 (julgado antecipadamente parte do
+--     mérito), 50118 (liminarmente improcedente).
+--   - Homologação de acordo: não existe como texto literal "homologação de acordo"; o termo
+--     técnico trabalhista usado é "transação" — código 466 "Homologada a transação".
+-- TODO(confirmar): validar a lista de códigos de "prolação de sentença" contra casos reais
+-- (pode haver outras variações não cobertas: acordo homologado que extingue com resolução do
+-- mérito, sentenças em cumprimento/execução, etc.).
 movimentos_julgamento AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
@@ -183,17 +215,15 @@ movimentos_julgamento AS (
     LEFT JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
         AND tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
             AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
-    LEFT JOIN pje.tb_evento e ON e.id_evento = tpe.id_evento
-    LEFT JOIN pje.tb_evento_processual ep ON ep.id_evento_processual = e.id_evento
         AND (
-            tpe.ds_texto_final_externo ILIKE 'Conclusos%sentença%'
-            OR ep.ds_movimento ILIKE '%prolação%sentença%'
-            OR ep.ds_movimento ILIKE '%homologação%acordo%'
+            (tpe.id_evento = 51 AND tpe.ds_texto_final_externo ILIKE '%sentença%') -- Conclusão p/ sentença
+            OR tpe.id_evento IN (219, 220, 221, 50110, 50118) -- Prolação de sentença
+            OR tpe.id_evento = 466 -- Homologada a transação (homologação de acordo)
         )
     LEFT JOIN proxima_audiencia pa ON pa.id_processo_audiencia = r.id_processo_audiencia
         AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_julgamento)
         AND pa.dt_marcacao <= cal.limite_3_dias_uteis
-    WHERE ep.id_evento_processual IS NOT NULL OR pa.id_processo_audiencia IS NOT NULL
+    WHERE tpe.id_processo IS NOT NULL OR pa.id_processo_audiencia IS NOT NULL
 ),
 
 classificacao AS (
