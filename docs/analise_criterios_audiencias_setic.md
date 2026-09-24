@@ -146,7 +146,26 @@ Ainda **não confirmado**:
   usa a segunda via, igual à query original).
 - Se existe tabela de complemento/parâmetro estruturada para "tipo de documento" expedido
   (mais robusta que `ILIKE` em texto livre — ver seção 3.2).
-- A tabela de perito/laudo para a condição de "perícia ativa" (query 4.4, ainda não rodada).
+
+## 3.3 Perícia ativa — resolvido (`tb_processo_pericia`)
+
+O usuário forneceu a query do **painel de perícias do PAI** (`sql/painel_pericias_referencia.sql`),
+usada como fonte da condição "perícia ativa": `tb_processo_pericia` (status `L`/`S`/`A`/`M` =
+laudo em aberto, não finalizado) + `tb_proc_parte_expediente.dt_prazo_legal_parte` (prazo de
+entrega) + `tb_processo_expediente.ds_origem_expediente = 'PERICIA'` + `tb_pess_doc_identificacao.
+in_principal = 'S'` (perito principal).
+
+Implementado na CTE `movimentos_diligencia` (segundo `SELECT` do `UNION`, em
+`sql/audiencias_realizadas_v2_draft.sql`): perícia com status aberto **e**
+`dt_prazo_legal_parte >= CURRENT_DATE` (prazo válido) conta como diligência. Prazo vencido segue
+fora de escopo (regras do próprio painel de perícias, ponto 5 do cabeçalho do rascunho).
+
+**Ainda não confirmado:**
+- Se a janela de 3 dias úteis deve se aplicar à data de marcação da perícia (`pp.dt_marcacao`),
+  como para os demais movimentos, ou se "perícia ativa" deve contar independente de quando foi
+  marcada (já que é um estado contínuo, não um ato pontual como expedir um documento).
+- Se a referência de "prazo válido" deve ser `CURRENT_DATE` ou `CURRENT_DATE - 1 dia`, como no
+  relatório original do painel de perícias (`"Data de referência do relatório"`).
 
 ## 3.2 Códigos de movimento confirmados (amostra de `tb_evento_processual`)
 
@@ -162,7 +181,7 @@ mais `ILIKE` no catálogo:
 | Prolação de sentença | `219, 220, 221, 50110, 50118` | Não existe um movimento literal "Prolação de sentença"; o julgamento de mérito em 1º grau aparece como resultado específico (procedente/improcedente/procedente em parte/julgado antecipadamente/liminarmente improcedente) |
 | Homologação de acordo | `466` | Não existe texto literal "Homologação de acordo"; o termo técnico trabalhista é "transação" — `466 Homologada a transação (Valor da transação: ...)` |
 | Expedição de ofício / carta precatória / mandado | `60` (mesmo código para os três) | "Expedido(a) #{tipo de documento} a(o) #{destinatário}" — os três tipos são a MESMA movimentação genérica; só dá pra diferenciar pelo texto resolvido (`ds_texto_final_externo ILIKE '%Ofício%'` / `'%Carta Precatória%'` / `'%Mandado%'`) |
-| Perícia ativa | — | Nenhum movimento correspondente na amostra. Confirma que depende de tabela de perito/laudo à parte, ainda não localizada |
+| Perícia ativa | — | Nenhum movimento correspondente na amostra de `tb_evento_processual` — resolvido por outra via, ver seção 3.3 (`tb_processo_pericia`) |
 
 **Achado extra, sobre a query ORIGINAL (não o rascunho):** os ids `941` e `371`, usados nela
 como sinal adicional de "Efetiva" (`OR e.id_evento IN (941, 371)`), correspondem — pela mesma
@@ -229,11 +248,8 @@ LIMIT 100;
 -- 4.3 [RESOLVIDA pela query 4.2] ids 941/371 da query original = "Declarada a incompetência" /
 -- "Acolhida a exceção de incompetência" — ver achado extra na seção 3.2.
 
--- 4.4 Verificar se existe controle de perícia (perito/laudo) e onde fica o status/prazo
-SELECT table_name, column_name, data_type
-FROM information_schema.columns
-WHERE table_schema = 'pje'
-  AND (table_name ILIKE '%pericia%' OR table_name ILIKE '%perito%' OR table_name ILIKE '%laudo%');
+-- 4.4 [RESOLVIDA] Controle de perícia = tb_processo_pericia + tb_proc_parte_expediente +
+-- tb_processo_expediente — ver seção 3.3 e sql/painel_pericias_referencia.sql.
 
 -- 4.5 Validação da regra de dia útil já decidida (in_suspende_prazo OU in_suspende_audiencia,
 -- abrangência nacional ou SP/26) — conferir se a contagem de dias não-úteis por ano é plausível
@@ -256,6 +272,8 @@ ORDER BY dt_ano;
    seção 0, aplicados na CTE `parametros`.
 3. ~~Códigos dos 8 movimentos monitorados~~ — ver seção 3.2, aplicados nas CTEs
    `movimentos_diligencia`/`movimentos_julgamento`.
+3.1 ~~Localizar fonte de "perícia ativa"~~ — ver seção 3.3, `tb_processo_pericia` + query do
+   painel de perícias do PAI, aplicada na CTE `movimentos_diligencia`.
 
 **Ainda pendente:**
 4. Decidir os itens ambíguos/fora do documento (seção 0): tipo `8` "Instrução e Julgamento";
@@ -268,9 +286,8 @@ ORDER BY dt_ano;
    em `movimentos_julgamento` no rascunho (ver seção 3.2).
 6. Rodar a query 4.5 para validar a regra de dia útil contra a contagem real de dias não-úteis
    por ano.
-7. Localizar a tabela de perito/laudo para a condição de "perícia ativa" (query 4.4) e decidir o
-   tratamento de perícia com prazo vencido (painel de perícias do PAI, fora de escopo, ou
-   replicado aqui).
+7. Decidir se a janela de 3 dias úteis se aplica à marcação da perícia (`pp.dt_marcacao`) e se
+   a referência de "prazo válido" é `CURRENT_DATE` ou `CURRENT_DATE - 1 dia` (ver seção 3.3).
 8. Rodar a query 4.2.2 para checar se existe uma tabela de complemento estruturada para "tipo de
    documento" expedido (alternativa mais robusta ao `ILIKE` em `ds_texto_final_externo` usado
    hoje para diferenciar ofício/carta precatória/mandado, todos sob o código `60`).

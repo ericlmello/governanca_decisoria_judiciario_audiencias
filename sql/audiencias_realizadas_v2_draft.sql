@@ -16,8 +16,9 @@
  *           homologação de acordo) em até 3 dias úteis -> EFETIVA
  *   4. Instrução: diligência + Encerramento de Instrução -> EFETIVA;
  *      sem diligência + Julgamento -> EFETIVA.
- *   5. Perícia ativa com prazo VENCIDO não é tratada aqui (regra pertence ao
- *      painel de perícias do PAI — dependência externa, fora de escopo).
+ *   5. Perícia ativa (laudo em aberto, prazo válido) -> conta como diligência. Perícia com
+ *      prazo VENCIDO não é tratada aqui (regra pertence ao painel de perícias do PAI —
+ *      dependência externa, fora de escopo).
  *
  * Mapeamento de pje.tb_tipo_audiencia confirmado pelo usuário (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
@@ -44,8 +45,11 @@
  *   Prolação de sentença ......... 219, 220, 221, 50110, 50118 (julgamento de mérito, 1º grau)
  *   Homologação de acordo ........ 466 (Homologada a transação)
  *   Expedição ofício/carta precatória/mandado .. 60 (+ ds_texto_final_externo ILIKE por tipo)
- *   Perícia ativa ................ NENHUM movimento correspondente encontrado; depende de
- *                                  tabela de perito/laudo ainda não localizada (query 4.4)
+ *   Perícia ativa ................ não é movimento em tb_processo_evento; vem de
+ *                                  tb_processo_pericia (query do painel de perícias do PAI,
+ *                                  fornecida pelo usuário) — status aberto (L/S/A/M) +
+ *                                  prazo válido (tb_proc_parte_expediente.dt_prazo_legal_parte
+ *                                  >= CURRENT_DATE)
  *
  * ATENÇÃO — achado na query ORIGINAL (não só neste rascunho): os ids 941 e 371 que ela usa
  * como sinal extra de "Efetiva" (`OR e.id_evento IN (941, 371)`) correspondem, pela mesma
@@ -185,9 +189,21 @@ calendario_3du AS (
 -- tb_evento/tb_evento_processual.
 -- TODO(confirmar): existe tabela de complemento/parâmetro estruturada para "tipo de
 -- documento" (mais robusta que ILIKE em texto livre)? Não localizada na amostra devolvida.
--- TODO(confirmar): perícia ativa segue sem correspondência no catálogo de movimentos — não
--- há nenhum "#{...perícia...}" na amostra. Depende da tabela de perito/laudo (condição
--- "status != finalizado" + "prazo válido/não vencido"), ainda não localizada (query 4.4).
+--
+-- Perícia ativa: query do "painel de perícias do PAI" fornecida pelo usuário (mesma consulta
+-- usada tanto para prazo válido quanto vencido — a diferença está em como o prazo é
+-- interpretado depois). Aqui só entra a perícia ATIVA (laudo em aberto) com PRAZO VÁLIDO;
+-- prazo vencido segue as regras do painel de perícias do PAI (fora de escopo, conforme já
+-- definido na seção 2.5/regra 5 do cabeçalho deste arquivo).
+-- TODO(confirmar): a janela de 3 dias úteis se aplica à DATA DE MARCAÇÃO da perícia
+-- (pp.dt_marcacao), como para os demais diligências? Diferente de expedição de documento
+-- (ato pontual), perícia é um estado contínuo — pode fazer mais sentido contar como "ativa"
+-- independente de quando foi marcada, desde que aberta e com prazo válido na data de
+-- referência. Mantido com o mesmo critério de janela por consistência com os outros
+-- movimentos, até confirmação.
+-- TODO(confirmar): referência de "prazo válido" usa CURRENT_DATE; o relatório original do
+-- painel de perícias usa CURRENT_DATE - 1 dia como "data de referência" — confirmar se deve
+-- seguir o mesmo padrão aqui.
 movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
@@ -199,6 +215,23 @@ movimentos_diligencia AS (
         AND tpe.ds_texto_final_externo ILIKE ANY (ARRAY[
             '%Ofício%', '%Carta Precatória%', '%Mandado%'
         ])
+
+    UNION
+
+    SELECT DISTINCT r.id_processo_audiencia
+    FROM audiencias_realizadas r
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
+    INNER JOIN pje.tb_processo_pericia pp ON pp.id_processo_trf = r.num_proc_id_origem
+    INNER JOIN pje.tb_proc_parte_expediente ppex
+        ON ppex.id_processo_parte_expediente = pp.id_proc_parte_exp_ultimo
+    INNER JOIN pje.tb_processo_expediente pex ON pex.id_processo_expediente = ppex.id_processo_expediente
+    LEFT JOIN pje.tb_pess_doc_identificacao pdi ON pdi.id_pessoa = pp.id_pessoa_perito
+    WHERE pp.cd_status_pericia IN ('L', 'S', 'A', 'M') -- laudo em aberto (não finalizado)
+        AND pex.ds_origem_expediente = 'PERICIA'
+        AND pdi.in_principal = 'S'
+        AND ppex.dt_prazo_legal_parte >= CURRENT_DATE -- prazo válido/não vencido
+        AND pp.dt_marcacao BETWEEN date_trunc('day', r.dta_audiencia::date)
+            AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
 ),
 
 -- Movimentos de encerramento (conclusão/prolação de sentença, homologação de
