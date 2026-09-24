@@ -7,18 +7,44 @@
  * para o comparativo completo com a query original (sql/audiencias_realizadas_original.sql).
  *
  * Regras implementadas (ver seção 2 do doc de análise):
- *   1. Regra geral: redesignação de audiência da MESMA categoria -> ADIADA.
+ *   1. Regra geral: redesignação de audiência da MESMA categoria (agrupando variantes
+ *      sumaríssimo/videoconferência) -> ADIADA.
  *   2. Inicial: qualquer audiência subsequente (UNA/Instrução/Encerramento de
  *      Instrução/Julgamento) -> EFETIVA.
  *   3. UNA: bipartição (Instrução designada) -> ADIADA por padrão, exceto:
- *        a) diligência + Encerramento de Instrução em até 3 dias úteis -> EFETIVA
+ *        a) diligência E Encerramento de Instrução designado (AMBOS, não só a diligência)
+ *           em até 3 dias úteis -> EFETIVA
  *        b) sem diligência + Julgamento (ou conclusão/prolação sentença/
  *           homologação de acordo) em até 3 dias úteis -> EFETIVA
- *   4. Instrução: diligência + Encerramento de Instrução -> EFETIVA;
+ *   4. Instrução: diligência E Encerramento de Instrução -> EFETIVA;
  *      sem diligência + Julgamento -> EFETIVA.
  *   5. Perícia ativa (laudo em aberto, prazo válido) -> conta como diligência. Perícia com
  *      prazo VENCIDO não é tratada aqui (regra pertence ao painel de perícias do PAI —
  *      dependência externa, fora de escopo).
+ *
+ * CORREÇÕES feitas numa releitura cuidadosa do documento (bugs de implementação da versão
+ * anterior deste rascunho, não dúvidas de negócio — o texto do documento já respondia):
+ *   a) Regra 1 comparava id_tipo_audiencia EXATO da próxima audiência com o da atual, então
+ *      UNA presencial -> UNA videoconferência (ids diferentes, mesma categoria) não era detectado
+ *      como "mesma categoria redesignada". Corrigido para comparar por grupo (array).
+ *   b) Regras 3a e 4 checavam só a diligência, sem checar se Encerramento de Instrução também
+ *      foi designado — mas o documento diz explicitamente "a designação de Encerramento de
+ *      Instrução é obrigatória quando há diligências pendentes", ou seja, os dois sinais juntos
+ *      são exigidos. Corrigido via nova CTE encerramento_instrucao_na_janela.
+ *   c) "Marcação de audiência de julgamento" (regras 3b/4) só olhava a audiência imediatamente
+ *      seguinte (proxima_audiencia, LIMIT 1) — mas na bipartição UNA->Instrução, o Julgamento
+ *      normalmente vem DEPOIS da Instrução, não é "a próxima" em relação à UNA original. Corrigido
+ *      com a nova CTE audiencias_subsequentes (todas as audiências futuras, não só a 1ª).
+ *
+ * LACUNAS NO PRÓPRIO DOCUMENTO (não são bug do rascunho — o texto simplesmente não cobre estes
+ * casos; caem no ELSE 'Adiada' por omissão, mas merecem confirmação da SETIC):
+ *   d) O que acontece se uma UNA é seguida de um tipo que NÃO é UNA nem Instrução (ex.:
+ *      Encerramento de Instrução ou Julgamento designados diretamente, pulando a Instrução)?
+ *      O documento só cobre "designa nova UNA" e "designa Instrução (bipartição)".
+ *   e) Para Instrução (seção 2.4), qual o status quando NEM "diligência + Encerramento de
+ *      Instrução" NEM "sem diligência + Julgamento" se aplicam (ex.: nada acontece depois)?
+ *      Ao contrário da UNA (que tem o rótulo explícito "bipartição injustificada" para esse caso),
+ *      o documento não dá um rótulo equivalente para a Instrução.
  *
  * Mapeamento de pje.tb_tipo_audiencia confirmado pelo usuário (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
@@ -27,8 +53,9 @@
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
  *
- * TODO(decisão) — tipos que o documento NÃO define regra explícita para, e que por isso
- * são marcados como status = 'Não classificado' em vez de um chute de Efetiva/Adiada:
+ * TODO(decisão) — tipos que o documento NÃO define regra explícita para. Em vez de arriscar
+ * um chute de Efetiva/Adiada, ficam de fora da população avaliada (filtro WHERE de
+ * audiencias_realizadas) até decisão do usuário/SETIC:
  *   - 8  Instrução e Julgamento (audiência única que já conclui com julgamento — é uma
  *        variante de Instrução, ou deve ter regra própria já que não depende de sinal
  *        posterior?)
@@ -127,22 +154,34 @@ audiencias_realizadas AS (
         and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 10)
 ),
 
--- Próxima audiência (de qualquer tipo) designada para o mesmo processo após a atual.
-proxima_audiencia AS (
+-- TODAS as audiências subsequentes (não só a próxima) designadas para o mesmo processo após a
+-- atual. Necessária porque, na bipartição UNA->Instrução, o "Encerramento de Instrução" e o
+-- "Julgamento" normalmente NÃO são a audiência imediatamente seguinte (esse lugar já é ocupado
+-- pela Instrução) — são audiências posteriores a ela. Uma versão anterior deste rascunho usava
+-- só a audiência imediatamente seguinte (LIMIT 1) para checar esses dois sinais, o que os
+-- deixava de detectar sempre que houvesse qualquer audiência intermediária. Corrigido aqui.
+audiencias_subsequentes AS (
     SELECT
         r.id_processo_audiencia,
-        r.id_tipo_audiencia AS id_tipo_audiencia_origem,
-        tpa2.id_tipo_audiencia AS id_tipo_audiencia_proxima,
-        tpa2.dt_marcacao
+        tpa2.id_tipo_audiencia,
+        tpa2.dt_marcacao,
+        ROW_NUMBER() OVER (PARTITION BY r.id_processo_audiencia ORDER BY tpa2.dt_marcacao ASC) AS ordem
     FROM audiencias_realizadas r
-    LEFT JOIN LATERAL (
-        SELECT tpa2.id_tipo_audiencia, tpa2.dt_marcacao
-        FROM pje.tb_processo_audiencia tpa2
-        WHERE tpa2.id_processo_trf = r.num_proc_id_origem
-          AND tpa2.dt_marcacao > r.dta_audiencia
-        ORDER BY tpa2.dt_marcacao ASC
-        LIMIT 1
-    ) tpa2 ON TRUE
+    INNER JOIN pje.tb_processo_audiencia tpa2
+        ON tpa2.id_processo_trf = r.num_proc_id_origem
+        AND tpa2.dt_marcacao > r.dta_audiencia
+),
+
+-- Próxima audiência (a imediatamente seguinte, ordem = 1) — usada só para as três checagens que
+-- de fato dependem de "qual é a próxima": regra geral de mesma categoria, Inicial->qualquer
+-- subsequente, e UNA->Instrução define bipartição.
+proxima_audiencia AS (
+    SELECT
+        id_processo_audiencia,
+        id_tipo_audiencia AS id_tipo_audiencia_proxima,
+        dt_marcacao
+    FROM audiencias_subsequentes
+    WHERE ordem = 1
 ),
 
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de
@@ -235,9 +274,27 @@ movimentos_diligencia AS (
             AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
 ),
 
+-- Encerramento de Instrução designado dentro da janela de 3 dias úteis — checagem GERAL
+-- (qualquer audiência subsequente desse tipo dentro da janela, via audiencias_subsequentes),
+-- não só "a próxima". Na bipartição UNA->Instrução, o Encerramento normalmente vem DEPOIS da
+-- Instrução (que já ocupa o lugar de "próxima"), então checar só proxima_audiencia (como uma
+-- versão anterior deste rascunho fazia) nunca encontraria esse sinal.
+-- Achado na releitura do documento: a linha "A designação de Encerramento de Instrução é
+-- obrigatória quando há diligências pendentes" confirma que esse sinal é EXIGIDO junto com a
+-- diligência para o resultado Efetiva — não bastava checar só a diligência, como o rascunho
+-- anterior fazia (corrigido abaixo, no CASE de classificacao).
+encerramento_instrucao_na_janela AS (
+    SELECT DISTINCT s.id_processo_audiencia
+    FROM audiencias_subsequentes s
+    CROSS JOIN parametros p
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = s.id_processo_audiencia
+    WHERE s.id_tipo_audiencia = ANY (p.tipo_encerramento_instrucao)
+      AND s.dt_marcacao <= cal.limite_3_dias_uteis
+),
+
 -- Movimentos de encerramento (conclusão/prolação de sentença, homologação de
 -- acordo, marcação de julgamento) em até 3 dias úteis.
--- Achados (mesma amostra):
+-- Achados (amostra de tb_evento_processual/tb_evento):
 --   - Conclusão para sentença: código 51 "Conclusos os autos para #{tipo de conclusão}...",
 --     igual à lógica já usada na query original (texto resolvido contendo "sentença").
 --   - Prolação de sentença: não existe como movimento literal; o julgamento de mérito em
@@ -246,6 +303,9 @@ movimentos_diligencia AS (
 --     mérito), 50118 (liminarmente improcedente).
 --   - Homologação de acordo: não existe como texto literal "homologação de acordo"; o termo
 --     técnico trabalhista usado é "transação" — código 466 "Homologada a transação".
+--   - Marcação de audiência de julgamento: QUALQUER audiência subsequente desse tipo dentro da
+--     janela (via audiencias_subsequentes), mesmo raciocínio do Encerramento de Instrução acima
+--     — corrigido; a versão anterior só olhava a audiência imediatamente seguinte.
 -- TODO(decisão SETIC): "Prolação de sentença" hoje só cobre sentença DE MÉRITO. Existem
 -- também candidatos a sentença TERMINATIVA (extinção sem resolução do mérito), não incluídos
 -- até confirmação: 456 (Extinção) e subcausas 458/459/461/463/464/465, 454 (Indeferimento da
@@ -253,59 +313,79 @@ movimentos_diligencia AS (
 movimentos_julgamento AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
-    CROSS JOIN parametros p
     INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
-    LEFT JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
-        AND tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
-            AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
+    INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
+    WHERE tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
+        AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
         AND (
             (tpe.id_evento = 51 AND tpe.ds_texto_final_externo ILIKE '%sentença%') -- Conclusão p/ sentença
             OR tpe.id_evento IN (219, 220, 221, 50110, 50118) -- Prolação de sentença (mérito)
             -- OR tpe.id_evento IN (456, 458, 459, 461, 463, 464, 465, 454, 50126) -- sentença terminativa (TODO decisão SETIC)
             OR tpe.id_evento = 466 -- Homologada a transação (homologação de acordo)
         )
-    LEFT JOIN proxima_audiencia pa ON pa.id_processo_audiencia = r.id_processo_audiencia
-        AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_julgamento)
-        AND pa.dt_marcacao <= cal.limite_3_dias_uteis
-    WHERE tpe.id_processo IS NOT NULL OR pa.id_processo_audiencia IS NOT NULL
+
+    UNION
+
+    SELECT DISTINCT s.id_processo_audiencia
+    FROM audiencias_subsequentes s
+    CROSS JOIN parametros p
+    INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = s.id_processo_audiencia
+    WHERE s.id_tipo_audiencia = ANY (p.tipo_julgamento)
+      AND s.dt_marcacao <= cal.limite_3_dias_uteis
 ),
 
 classificacao AS (
     SELECT
         r.*,
         CASE
-            -- 1) Regra geral: redesignação da mesma categoria (Inicial->Inicial,
-            --    UNA->UNA, Instrução->Instrução — cobre variantes sumaríssimo/videoconf
-            --    porque comparamos o id exato da próxima com o id exato da atual)
-            WHEN pa.id_tipo_audiencia_proxima = r.id_tipo_audiencia_origem THEN 'Adiada'
+            -- 1) Regra geral: redesignação da MESMA CATEGORIA. Agrupa variantes sumaríssimo/
+            --    videoconferência via os arrays de parametros — uma versão anterior deste
+            --    rascunho comparava o id exato (pa.id_tipo_audiencia_proxima = r.id_tipo_audiencia),
+            --    o que deixava passar despercebido, por exemplo, UNA presencial seguida de UNA
+            --    por videoconferência (ids diferentes, mesma categoria). Corrigido aqui.
+            WHEN (r.id_tipo_audiencia = ANY (p.tipo_inicial) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_inicial))
+              OR (r.id_tipo_audiencia = ANY (p.tipo_una) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_una))
+              OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao))
+                THEN 'Adiada'
 
             -- 2) Audiência Inicial: qualquer subsequente conta como efetiva
             WHEN r.id_tipo_audiencia = ANY (p.tipo_inicial)
                  AND pa.id_tipo_audiencia_proxima IS NOT NULL THEN 'Efetiva'
 
-            -- 3) UNA -> Instrução (bipartição)
+            -- 3) UNA -> Instrução (bipartição). "Efetiva" por diligência exige TAMBÉM
+            --    Encerramento de Instrução designado (linha do documento: "A designação de
+            --    Encerramento de Instrução é obrigatória quando há diligências pendentes") —
+            --    não basta a diligência sozinha, como uma versão anterior deste rascunho fazia.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
                  AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NOT NULL
-                 -- TODO(confirmar): também exigir Encerramento de Instrução designado
-                 THEN 'Efetiva'
+                 AND enc.id_processo_audiencia IS NOT NULL
+                THEN 'Efetiva'
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
                  AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NULL
                  AND mj.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
                  AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
-                 THEN 'Adiada' -- bipartição injustificada
+                 THEN 'Adiada' -- bipartição injustificada (cobre inclusive diligência SEM
+                                -- Encerramento de Instrução designado, que cai aqui por
+                                -- eliminação das duas condições acima)
 
-            -- 4) Instrução
+            -- 4) Instrução — mesma lógica de exigir Encerramento de Instrução junto com a
+            --    diligência ("Mesmos critérios aplicados à audiência UNA", conforme o documento).
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NOT NULL
-                 -- TODO(confirmar): exigir Encerramento de Instrução designado
-                 THEN 'Efetiva'
+                 AND enc.id_processo_audiencia IS NOT NULL
+                THEN 'Efetiva'
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NULL
                  AND mj.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
 
+            -- TODO(decisão SETIC): o documento não define o que acontece quando UNA é seguida
+            -- de um tipo que não é UNA nem Instrução (ex.: Encerramento de Instrução ou
+            -- Julgamento diretamente, pulando a Instrução), nem o que acontece com Instrução
+            -- quando nem diligência+Encerramento nem "sem diligência+Julgamento" se aplicam.
+            -- Ambos os casos caem aqui por omissão (Adiada) — ver seção 2 do doc de análise.
             ELSE 'Adiada'
         END AS status
     FROM audiencias_realizadas r
@@ -313,6 +393,7 @@ classificacao AS (
     LEFT JOIN proxima_audiencia pa ON pa.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN movimentos_diligencia md ON md.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN movimentos_julgamento mj ON mj.id_processo_audiencia = r.id_processo_audiencia
+    LEFT JOIN encerramento_instrucao_na_janela enc ON enc.id_processo_audiencia = r.id_processo_audiencia
 )
 SELECT
     nr_processo, id_processo,

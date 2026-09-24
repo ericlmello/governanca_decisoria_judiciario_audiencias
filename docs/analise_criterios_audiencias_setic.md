@@ -67,6 +67,11 @@ O documento define uma **árvore de decisão por tipo de audiência**:
 Se o magistrado **redesigna audiência da mesma categoria** da que acabou de ocorrer
 (Inicial→Inicial, UNA→UNA, Instrução→Instrução) → **ADIADA**, sem janela de tempo definida.
 
+> O documento é explícito (linha 12 do texto extraído): "Aplica-se a todos os tipos: Inicial,
+> UNA (rito ordinário ou sumaríssimo) e Instrução." — ou seja, o escopo do documento inteiro
+> (não só desta regra) é declarado como restrito a essas 3 famílias. Isso reforça (mas não
+> resolve sozinho) a pergunta 3 da seção 0 sobre os tipos fora do documento.
+
 ### 2.2 Audiência Inicial
 - Designação de **qualquer** audiência subsequente (UNA, Instrução, Encerramento de Instrução
   ou Julgamento) → **EFETIVA** ("cumpriu seu papel ao gerar encaminhamento processual").
@@ -170,6 +175,47 @@ de referência do relatório" do painel de perícias original. Implementado em
 - Se a janela de 3 dias úteis deve se aplicar à data de marcação da perícia (`pp.dt_marcacao`),
   como para os demais movimentos, ou se "perícia ativa" deve contar independente de quando foi
   marcada (já que é um estado contínuo, não um ato pontual como expedir um documento).
+
+## 3.4 Correções de implementação encontradas numa releitura linha a linha do documento
+
+Uma releitura cuidadosa do texto extraído do documento (comparando frase a frase com o rascunho
+v2) encontrou **3 bugs de implementação** — não são dúvidas de negócio, o próprio texto do
+documento já responde, o rascunho é que modelava errado — e **2 lacunas no documento** que essas
+não são bug nenhum, é o texto que simplesmente não cobre o caso.
+
+**Bugs corrigidos:**
+
+a. **"Mesma categoria redesignada" comparava id exato, não categoria.** O rascunho anterior
+   comparava `pa.id_tipo_audiencia_proxima = r.id_tipo_audiencia` (id exato). Como cada categoria
+   tem 4 variantes (presencial/videoconferência × ordinário/sumaríssimo — ver seção 0), uma UNA
+   presencial seguida de uma UNA por videoconferência (ids diferentes, mesma categoria) não era
+   detectada como "mesma categoria redesignada". Corrigido para comparar por grupo (os arrays de
+   `parametros`).
+b. **"Encerramento de Instrução designado" nunca era exigido de fato.** O rascunho anterior só
+   checava se havia diligência (perícia/ofício/carta/mandado) para marcar Efetiva nos ramos de
+   bipartição da UNA e da Instrução, mas a linha do documento "A designação de Encerramento de
+   Instrução é **obrigatória** quando há diligências pendentes" deixa claro que os dois sinais
+   são exigidos **juntos**. Corrigido com a nova CTE `encerramento_instrucao_na_janela`.
+c. **"Marcação de audiência de julgamento" só olhava a audiência imediatamente seguinte.** O
+   rascunho anterior usava `proxima_audiencia` (a única audiência seguinte, via `LIMIT 1`) para
+   checar esse sinal. Mas na bipartição UNA→Instrução, a Instrução já ocupa o lugar de "próxima
+   audiência" — o Julgamento (ou o Encerramento de Instrução, item b) viria depois dela, não é "a
+   próxima" em relação à UNA original. Esse sinal nunca seria detectado nesses casos. Corrigido
+   com a nova CTE `audiencias_subsequentes`, que lista **todas** as audiências futuras do
+   processo, não só a primeira.
+
+**Lacunas do próprio documento (não são bug, precisam de decisão — itens novos na lista de
+dúvidas para a SETIC, seção 5):**
+
+d. O documento cobre só dois desfechos para a UNA: "designa nova UNA" e "designa Instrução
+   (bipartição)". O que acontece se a UNA é seguida de um tipo que **não é nenhum dos dois** —
+   por exemplo, Encerramento de Instrução ou Julgamento designados diretamente, pulando a
+   Instrução? Hoje cai em Adiada por omissão (último `ELSE` do `CASE`).
+e. Para a Instrução (seção 2.4), a UNA tem um rótulo explícito para o caso "nada aconteceu"
+   ("bipartição injustificada" → Adiada), mas a Instrução não tem um equivalente escrito. Qual o
+   status quando **nem** "diligência + Encerramento de Instrução" **nem** "sem diligência +
+   Julgamento" se aplicam? Hoje também cai em Adiada por omissão, por analogia com a UNA — mas
+   isso é uma suposição minha, não algo que o texto diga.
 
 ## 3.2 Códigos de movimento confirmados (amostra de `tb_evento_processual`)
 
@@ -278,11 +324,19 @@ ORDER BY dt_ano;
    `movimentos_diligencia`/`movimentos_julgamento`.
 3.1 ~~Localizar fonte de "perícia ativa"~~ — ver seção 3.3, `tb_processo_pericia` + query do
    painel de perícias do PAI, aplicada na CTE `movimentos_diligencia`.
+3.2 ~~3 bugs de implementação encontrados numa releitura linha a linha do documento~~ — ver
+   seção 3.4: (a) "mesma categoria" comparava id exato em vez de grupo; (b) "Encerramento de
+   Instrução designado" nunca era exigido junto com a diligência; (c) "marcação de audiência de
+   julgamento" só olhava a audiência imediatamente seguinte. Todos corrigidos no rascunho v2.
 
 **Ainda pendente:**
 4. Decidir os itens ambíguos/fora do documento (seção 0): tipo `8` "Instrução e Julgamento";
    tipos `7`/`9` "...RS"; e o bloco Conciliação/Mediação/Pública/Inquirição/Justificação Prévia
-   — hoje fora da população avaliada.
+   — hoje fora da população avaliada. (O documento reforça essa restrição de escopo na seção 2.1
+   — ver nota nessa seção.)
+4.1 Duas lacunas do próprio documento, achadas na mesma releitura (seção 3.4, itens d/e): o que
+   acontece com UNA seguida de um tipo que não é UNA nem Instrução; e qual o status da Instrução
+   quando nem diligência+Encerramento nem sem-diligência+Julgamento se aplicam.
 5. Confirmar com a SETIC se os ids `941`/`371` da query **original** (achado da seção 3.2) devem
    ser replicados na v2 como sinal de efetividade.
 5.1 Confirmar com a SETIC se "Prolação de sentença" deve incluir sentença terminativa (extinção
