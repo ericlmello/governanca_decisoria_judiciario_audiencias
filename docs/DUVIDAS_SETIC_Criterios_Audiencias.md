@@ -56,11 +56,16 @@ Uma UNA é seguida de um tipo de audiência **que não está em nenhum dos dois 
 - Julgamento (id_tipo_audiencia = 4)
 - Conciliação / Mediação / outro
 
+### Hipótese de trabalho (para confirmar, não assumida na query):
+Por analogia com a Audiência Inicial (que tem regra explícita: qualquer subsequente entre 4 tipos listados = Efetiva) e com o espírito geral do documento (repetir a mesma categoria = Adiada; **avançar** de categoria = Efetiva), UNA seguida de Encerramento de Instrução ou Julgamento **diretamente** (pulando a Instrução) poderia ser **Efetiva** — o processo avançou de estágio, não regrediu nem repetiu.
+
+**Contraponto que nos impede de assumir isso sozinhos:** o documento trata a bipartição UNA→Instrução com regras **propositalmente rígidas** (Adiada por padrão, só Efetiva com diligência+Encerramento ou sem diligência+Julgamento em até 3 dias) — justamente porque é considerado suspeito (a UNA "deveria" ter colhido a prova oral). Se UNA→Encerramento/Julgamento direto virasse automaticamente Efetiva sem nenhum escrutínio, isso seria **mais permissivo** que o próprio caminho da bipartição, o que pode não ser a intenção.
+
 ### Pergunta:
-Qual é o status esperado? O documento não cobre explicitamente. A query v2 classifica como **Adiada** por omissão — é isso correto?
+**Confirma a hipótese acima (UNA → Encerramento/Julgamento direto = Efetiva, por analogia com a Inicial)?** Ou esse salto de etapa deveria receber o mesmo escrutínio de 3 dias úteis da bipartição (e nesse caso, com quais movimentos)?
 
 ### Impacto técnico:
-Falta ramo decisório (cai no `ELSE` genérico). Se a resposta for "segue regra X da Instrução" ou "sempre Efetiva", precisará de ajuste lógico.
+Falta ramo decisório (cai no `ELSE` genérico, hoje Adiada). Se a hipótese for confirmada, adicionar ramo "Efetiva" para esses dois desfechos; se precisar de escrutínio, replicar a lógica de 3 dias úteis da bipartição.
 
 ---
 
@@ -103,16 +108,23 @@ Mapeamento de `tb_tipo_audiencia` confirmado:
 ### Dúvida:
 O tipo 8 não aparece no documento original. Como classificá-lo?
 
+### Hipótese de trabalho (para confirmar, não assumida na query):
+Por já conter o julgamento **no mesmo ato**, não há diligência pendente nem necessidade de sinal posterior — diferente da Instrução comum (que precisa de um sinal futuro para provar que "funcionou"), o tipo 8 já entrega o resultado na própria audiência. Isso o aproxima do caso já levantado na dúvida #1 (UNA/Inicial sem nova audiência, mas com sentença/acordo = Efetiva): audiência que se resolve sozinha não deveria depender de localizar uma audiência subsequente.
+
+**Ressalva:** se o tipo 8 for **redesignado** como novo tipo 8 (mesma categoria), isso sinaliza que o julgamento **não** ocorreu no ato original — nesse caso a regra geral de "mesma categoria redesignada = Adiada" deveria ter prioridade sobre a hipótese de "sempre Efetiva".
+
 ### Opções:
-a) Segue a árvore da **Instrução** (verifica diligência + Encerramento, ou Julgamento designado)  
-b) Segue a árvore da **UNA** (mesma lógica)  
-c) Regra própria (qual?)  
+a) **Sempre Efetiva** (exceto se redesignado como novo tipo 8 → Adiada pela regra geral) — hipótese acima  
+b) Segue a árvore completa da **Instrução** (verifica diligência + Encerramento, ou Julgamento designado)  
+c) Segue a árvore da **UNA** (mesma lógica)  
+d) Regra própria (qual?)  
+e) Tipo 8 fica **fora do escopo avaliado** (como Conciliação/Mediação já ficam)
 
 ### Pergunta:
-Qual é a intenção do tipo 8 e como deveria ser classificado?
+**Confirma a opção (a)?** Se não, qual das outras se aplica?
 
 ### Impacto técnico:
-Query v2 atual trata como tipo desconhecido → cai em ADIADA por omissão. Se for (a), bastará aplicar a lógica de Instrução; se for (b) ou (c), precisará de revisão.
+Query v2 atual trata como tipo desconhecido → cai em ADIADA por omissão. Se (a), adicionar ramo de prioridade máxima "Efetiva" (após checar redesignação de mesma categoria); se (b)/(c), aplicar a árvore correspondente; se (e), remover da população avaliada (`tipo_inicial`/`tipo_una`/`tipo_instrucao`).
 
 ---
 
@@ -276,9 +288,9 @@ Recomendação já adotada na v2 (aguardando confirmação do padrão de carga):
 | # | Assunto | Linha do Documento | Status na v2 | Risco |
 |---|---|---|---|---|
 | 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | Adiada por omissão | **Alto** (regressão possível) |
-| 2 | UNA → tipo fora do escopo (Enc. Instrução / Julgamento) | 26–55 | Adiada por omissão | **Médio** (lacuna do documento) |
+| 2 | UNA → tipo fora do escopo (Enc. Instrução / Julgamento) — **hipótese: Efetiva**, por confirmar | 26–55 | Adiada por omissão | **Médio** (lacuna do documento) |
 | 3 | Instrução sem diligência e sem Julgamento | 57–73 | Adiada por omissão | **Médio** (lacuna do documento) |
-| 4 | Tipo 8 "Instrução e Julgamento" | — | Adiada por omissão | **Médio** (fora do escopo original) |
+| 4 | Tipo 8 "Instrução e Julgamento" — **hipótese: sempre Efetiva** (exceto redesignação), relacionado à dúvida #1 | — | Adiada por omissão | **Médio** (fora do escopo original) |
 | 5 | Sentença terminativa × sentença de mérito | 81–84 | Apenas mérito | **Médio** (diferença de negócio) |
 | 6 | Perícia: avaliada quando? | 76 | Data de apuração (hoje) | **Médio** (semântica de reprocessamento) |
 | 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | Restrito aos 4 tipos | **Baixo** (improvável conflito real) |

@@ -40,9 +40,11 @@ Exemplo: Inicial → Acordo homologado (sem nova audiência). Efetiva ou Adiada?
 
 ### Dúvida #2: UNA Seguida de Tipo Fora do Escopo
 
-Status: **Aguardando resposta**
+Status: **Aguardando resposta** (reformulada como pergunta fechada, com hipótese)
 
 Exemplo: UNA → Encerramento de Instrução designado diretamente (pulando a Instrução).
+
+**Hipótese proposta:** Efetiva, por analogia com a regra da Inicial (avançar de categoria = Efetiva, só repetir a mesma categoria = Adiada). Contraponto: a bipartição UNA→Instrução tem regras propositalmente rígidas por ser considerada suspeita — se este outro salto virasse Efetiva sem escrutínio, seria mais permissivo que a própria bipartição.
 
 **Impacto:** Médio
 
@@ -60,9 +62,11 @@ Pergunta: Por analogia com UNA, seria Adiada? Ou existe outra regra?
 
 ### Dúvida #4: Tipo 8 "Instrução e Julgamento"
 
-Status: **Aguardando resposta**
+Status: **Aguardando resposta** (reformulada como pergunta fechada, com hipótese)
 
 Tipo fora do documento original. Segue a árvore da Instrução ou tem regra própria?
+
+**Hipótese proposta:** Sempre Efetiva (exceto se redesignado como novo tipo 8, que cairia na regra geral de mesma categoria = Adiada) — por já conter o julgamento no mesmo ato, não depende de sinal posterior. Relacionado à dúvida #1 (mesmo princípio: audiência que se resolve sozinha não deveria depender de audiência subsequente).
 
 **Impacto:** Médio
 
