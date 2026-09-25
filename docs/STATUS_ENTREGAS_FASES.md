@@ -10,8 +10,8 @@
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
 | 1 | Análise de regras | ✅ Completo | — | Fase 2 finalizar |
-| 2 | Query v2 + bugs | ⚠️ 75% (em progresso) | SETIC #1, #3, #5, #6 | Finalizar com respostas |
-| 3 | Testes ~100k | 🔄 Planejado | Fase 2 + SETIC #1, #3, #5, #6 | Executar após respostas |
+| 2 | Query v2 + bugs | ⚠️ 75% (em progresso) | SETIC #1, #3, #5 | Finalizar com respostas |
+| 3 | Testes ~100k | 🔄 Planejado | Fase 2 + SETIC #1, #3, #5 | Executar após respostas |
 | 4 | Monitoramento | ⚠️ Estruturado (4a–4c) | SETIC #10 (só para 4d) | Implementar 4a–4c agora |
 | 5 | Produção | 📋 Planejado | Fase 3 OK + Fase 4a–4c | Após testes aprovados |
 
@@ -46,22 +46,23 @@
   - Implementação das 7 regras formalizadas
   - 6 bugs corrigidos (comparação de categoria, Encerramento obrigatório, Julgamento tardio, calendário, busca limitada, buffer de 10 dias, tipo de dado)
   - Regras para dúvidas #2 e #4 implementadas como hipóteses (decisão do usuário)
-  - TODOs marcados para dúvidas #1, #3, #5, #6, #8, #10
+  - ✅ TODO de Dúvida #2 removido (2026-09-25, Perícia Ativa respondida)
+  - TODOs marcados para dúvidas #1, #3, #5, #8, #10
 
 ### Bloqueadores Críticos
 | Dúvida | Tópico | Status | Impacto | Prioridade |
 |--------|--------|--------|---------|-----------|
 | #1 | Inicial sem nova audiência (acordo/sentença) | Aberta | **Alto** (regressão vs v1) | BLOQUEADOR |
+| #2 | Perícia ativa avaliada quando? | ✅ Respondida (2026-09-25) | Médio | ✅ IMPLEMENTADA |
 | #3 | Instrução sem diligência e sem Julgamento | Aberta | Médio | BLOQUEADOR |
 | #5 | Sentença terminativa = "prolação"? | Aberta | Médio | BLOQUEADOR |
-| #6 | Perícia ativa avaliada quando? | Aberta | Médio | BLOQUEADOR |
 | #8 | Calendário: abrangência municipal? | Aberta | Baixo | Opcional (SP only) |
-| #10 | Watermark autorreferente (Dúvida #10) | Aberta | **Alto** (arquitetura) | NÃO bloqueia Fases 3–4a |
+| #10 | Watermark autorreferente | Aberta | **Alto** (arquitetura) | NÃO bloqueia Fases 3–4a |
 
 ### O que falta para finalizar Fase 2
-- [ ] Resposta SETIC a dúvidas #1, #3, #5, #6 (críticas)
+- [ ] Resposta SETIC a dúvidas #1, #3, #5 (críticas)
 - [ ] Implementar lógica conforme respostas
-- [ ] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md
+- [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvida #2, 2026-09-25)
 
 ---
 
@@ -77,14 +78,16 @@
   - Critérios de sucesso definidos
 
 ### Bloqueadores
-- ⏳ Resposta SETIC a dúvidas #1, #3, #5, #6 (para finalizar query)
+- ⏳ Resposta SETIC a dúvidas #1, #3, #5 (para finalizar query)
 - ⏳ Acesso a banco de dados (~100k audiências reais)
 
 ### O que fazer quando respostas chegarem
-1. Atualizar query v2 com lógica respondida
+1. Atualizar query v2 com lógica respondida (dúvidas #1, #3, #5)
 2. Executar testes (seção 5 do PLANO_TESTES_FASE_3.md)
 3. Gerar relatório de delta vs. v1
 4. Documentar regressões (se houver)
+
+**Nota:** Dúvida #2 já foi respondida (2026-09-25) e implementada
 
 ---
 
@@ -161,9 +164,9 @@
 ### O que SETIC precisa fazer (Bloqueadores)
 Responder formalmente a dúvidas:
 - [ ] #1: Inicial sem nova audiência → Efetiva ou Adiada?
+- [x] #2: Perícia ativa avaliada quando? **→ Opção (c) Marcada na janela (2026-09-25)**
 - [ ] #3: Instrução sem diligência e sem Julgamento → Adiada ou outra regra?
 - [ ] #5: Sentença terminativa conta como "prolação de sentença"?
-- [ ] #6: Perícia ativa avaliada como que (hoje vs. fim da janela)?
 - [ ] #8: Calendário suspensão municipal (granular, estadual ou nacional)?
 - [ ] #10: Watermark autorreferente é intencional? Existe reprocessamento?
 
