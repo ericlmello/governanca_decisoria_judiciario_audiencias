@@ -24,6 +24,11 @@
  *   5. Perícia ativa (laudo em aberto, prazo válido) -> conta como diligência. Perícia com
  *      prazo VENCIDO não é tratada aqui (regra pertence ao painel de perícias do PAI —
  *      dependência externa, fora de escopo).
+ *   6. Tipo 8 "Instrução e Julgamento": regra própria, sempre EFETIVA (exceto redesignação de
+ *      mesma categoria, regra 1) -> DECIDIDO pelo usuário, hipótese não confirmada pela SETIC.
+ *   7. UNA seguida de tipo que não é UNA nem Instrução (ex.: Encerramento de Instrução ou
+ *      Julgamento direto) -> EFETIVA -> DECIDIDO pelo usuário, hipótese não confirmada pela
+ *      SETIC.
  *
  * CORREÇÕES feitas numa releitura cuidadosa do documento (bugs de implementação da versão
  * anterior deste rascunho, não dúvidas de negócio — o texto do documento já respondia):
@@ -47,14 +52,19 @@
  * docs/analise_criterios_audiencias_setic.md, seção 7.
  *
  * LACUNAS NO PRÓPRIO DOCUMENTO (não são bug do rascunho — o texto simplesmente não cobre estes
- * casos; caem no ELSE 'Adiada' por omissão, mas merecem confirmação da SETIC):
- *   d) O que acontece se uma UNA é seguida de um tipo que NÃO é UNA nem Instrução (ex.:
- *      Encerramento de Instrução ou Julgamento designados diretamente, pulando a Instrução)?
- *      O documento só cobre "designa nova UNA" e "designa Instrução (bipartição)".
- *   e) Para Instrução (seção 2.4), qual o status quando NEM "diligência + Encerramento de
- *      Instrução" NEM "sem diligência + Julgamento" se aplicam (ex.: nada acontece depois)?
- *      Ao contrário da UNA (que tem o rótulo explícito "bipartição injustificada" para esse caso),
- *      o documento não dá um rótulo equivalente para a Instrução.
+ * casos):
+ *   d) [DECIDIDO pelo usuário — "aplique a regra geral quando não expressa"] O que acontece se
+ *      uma UNA é seguida de um tipo que NÃO é UNA nem Instrução (ex.: Encerramento de Instrução
+ *      ou Julgamento designados diretamente, pulando a Instrução)? O documento só cobre "designa
+ *      nova UNA" e "designa Instrução (bipartição)". Implementado: EFETIVA (regra 3d do CASE),
+ *      por analogia com a regra da Inicial. Hipótese ainda NÃO confirmada pela SETIC — ver
+ *      dúvida #2 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ *   e) [AINDA PENDENTE — não é caso de "avançar de categoria", não reformulada como (d)] Para
+ *      Instrução (seção 2.4), qual o status quando NEM "diligência + Encerramento de Instrução"
+ *      NEM "sem diligência + Julgamento" se aplicam (ex.: nada acontece depois)? Ao contrário da
+ *      UNA (que tem o rótulo explícito "bipartição injustificada" para esse caso), o documento
+ *      não dá um rótulo equivalente para a Instrução. Continua ADIADA por omissão — ver dúvida #3
+ *      em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
  *
  * Mapeamento de pje.tb_tipo_audiencia confirmado pelo usuário (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
@@ -63,6 +73,7 @@
  *   Instrução .................... 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo)
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
+ *   Instrução e Julgamento ....... 8 (regra própria, ver DECIDIDO abaixo — não está no documento)
  *
  * DECIDIDO pelo usuário: ids 7 ("UNA-RS ou Justificação Prévia") e 9 ("Una - RS") entram no
  * grupo UNA, com base na hipótese de que "RS" = "Rito Sumário" (terceiro rito trabalhista,
@@ -74,13 +85,15 @@
  * (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
  * juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública
  * (17, 30)) FICAM DE FORA da população avaliada. Já implementado assim (o WHERE de
- * audiencias_realizadas só inclui tipo_inicial/tipo_una/tipo_instrucao) — nenhuma mudança
- * necessária.
+ * audiencias_realizadas inclui só tipo_inicial/tipo_una/tipo_instrucao/tipo_instrucao_julgamento)
+ * — nenhuma mudança necessária.
  *
- * TODO(decisão) — ainda pendente:
- *   - 8  Instrução e Julgamento (audiência única que já conclui com julgamento — segue a
- *        árvore da Instrução (seção 2.4), ou tem regra própria já que não depende de sinal
- *        posterior? Ver árvore detalhada na conversa/seção 2 do doc de análise.)
+ * DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): tipo 8 "Instrução e
+ * Julgamento" (audiência única que já conclui com julgamento no mesmo ato) tem regra própria —
+ * sempre EFETIVA, exceto redesignação de mesma categoria (regra geral, prioridade). NÃO segue a
+ * árvore normal da Instrução (não depende de diligência/Encerramento/sinal posterior, porque o
+ * julgamento já ocorreu no próprio ato). Hipótese ainda não confirmada pela SETIC — ver dúvida #4
+ * em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
  *
  * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) confirmados pelo usuário:
  *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
@@ -122,10 +135,13 @@
 WITH parametros AS (
     SELECT
         ARRAY[3, 16, 22, 29]       AS tipo_inicial,
-        ARRAY[5, 19, 23, 31, 7, 9] AS tipo_una, -- 7/9 = RS (Rito Sumário, hipótese não confirmada)
+        ARRAY[5, 19, 23, 31, 7, 9] AS tipo_una, -- 7/9 = RS (Rito Sumário, confirmado pelo usuário)
         ARRAY[6, 12, 24, 27]       AS tipo_instrucao,
         ARRAY[10, 25]              AS tipo_encerramento_instrucao,
-        ARRAY[4]                   AS tipo_julgamento
+        ARRAY[4]                   AS tipo_julgamento,
+        ARRAY[8]                   AS tipo_instrucao_julgamento -- "Instrução e Julgamento":
+            -- julgamento no mesmo ato; regra própria (ver classificacao), não segue a árvore
+            -- normal da Instrução
 ),
 
 audiencias_realizadas AS (
@@ -163,12 +179,12 @@ audiencias_realizadas AS (
         and fase.in_ativo = 'S'
     WHERE
         tpa.cd_status_audiencia = 'F'
-        -- População avaliada = só os tipos com regra definida no documento (Inicial/UNA/
-        -- Instrução). Encerramento de Instrução e Julgamento são "sinais", não audiências
-        -- cuja efetividade é medida (mesmo raciocínio da query original, que excluía só o
-        -- tipo 4). Os tipos ambíguos/fora do documento (ver TODO(decisão) acima) ficam de
-        -- fora por ora — inclua-os aqui quando a regra deles for definida.
-        AND tpa.id_tipo_audiencia = ANY (p.tipo_inicial || p.tipo_una || p.tipo_instrucao)
+        -- População avaliada = os tipos com regra definida no documento (Inicial/UNA/
+        -- Instrução) + tipo 8 "Instrução e Julgamento" (regra própria, DECIDIDO pelo usuário —
+        -- ver classificacao). Encerramento de Instrução e Julgamento são "sinais", não
+        -- audiências cuja efetividade é medida (mesmo raciocínio da query original, que
+        -- excluía só o tipo 4).
+        AND tpa.id_tipo_audiencia = ANY (p.tipo_inicial || p.tipo_una || p.tipo_instrucao || p.tipo_instrucao_julgamento)
         AND tpt.cd_processo_status = 'D'
         AND date_trunc('day', tpa.dt_inicio) > '${VAR_ULT_DT_AUDIENCIA}'
         -- VAR_ULT_DT_AUDIENCIA vem da própria tabela de destino (marca d'água/watermark):
@@ -419,10 +435,23 @@ classificacao AS (
             --    rascunho comparava o id exato (pa.id_tipo_audiencia_proxima = r.id_tipo_audiencia),
             --    o que deixava passar despercebido, por exemplo, UNA presencial seguida de UNA
             --    por videoconferência (ids diferentes, mesma categoria). Corrigido aqui.
+            --    Inclui tipo_instrucao_julgamento (tipo 8): redesignado como novo tipo 8 sinaliza
+            --    que o julgamento NÃO ocorreu no ato original, então a regra geral prevalece
+            --    sobre a regra própria do tipo 8 (item 1.5 abaixo) — por isso vem primeiro no CASE.
             WHEN (r.id_tipo_audiencia = ANY (p.tipo_inicial) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_inicial))
               OR (r.id_tipo_audiencia = ANY (p.tipo_una) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_una))
               OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao))
+              OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao_julgamento))
                 THEN 'Adiada'
+
+            -- 1.5) DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): tipo 8
+            --      "Instrução e Julgamento" — julgamento ocorre no mesmo ato, não depende de
+            --      sinal posterior (diferente da Instrução comum, que precisa de um sinal futuro
+            --      para provar que "funcionou"). Sempre Efetiva, exceto redesignação de mesma
+            --      categoria (já tratada na regra 1 acima, com prioridade por vir antes). Ver
+            --      dúvida #4 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md — hipótese implementada,
+            --      não confirmada pela SETIC ainda.
+            WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) THEN 'Efetiva'
 
             -- 2) Audiência Inicial: qualquer subsequente conta como efetiva
             WHEN r.id_tipo_audiencia = ANY (p.tipo_inicial)
@@ -447,6 +476,20 @@ classificacao AS (
                                 -- Encerramento de Instrução designado, que cai aqui por
                                 -- eliminação das duas condições acima)
 
+            -- 3d) DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): UNA
+            --     seguida de qualquer OUTRO tipo avaliado que não seja mesma categoria (regra 1,
+            --     já tratada acima) nem Instrução (bipartição, regras 3a-3c acima, exaustivas
+            --     para esse caso) — ex.: Encerramento de Instrução ou Julgamento designados
+            --     diretamente, pulando a Instrução. Por eliminação (as regras anteriores já
+            --     cobrem mesma categoria e Instrução), chegar aqui com uma próxima audiência
+            --     definida significa que ela é de outro tipo avaliado — conta como Efetiva, por
+            --     analogia com a regra da Inicial (avançar de categoria = Efetiva, só repetir a
+            --     mesma categoria é Adiada). Ver dúvida #2 em
+            --     docs/DUVIDAS_SETIC_Criterios_Audiencias.md — hipótese implementada, não
+            --     confirmada pela SETIC ainda.
+            WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
+                 AND pa.id_tipo_audiencia_proxima IS NOT NULL THEN 'Efetiva'
+
             -- 4) Instrução — mesma lógica de exigir Encerramento de Instrução junto com a
             --    diligência ("Mesmos critérios aplicados à audiência UNA", conforme o documento).
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
@@ -457,11 +500,11 @@ classificacao AS (
                  AND md.id_processo_audiencia IS NULL
                  AND mj.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
 
-            -- TODO(decisão SETIC): o documento não define o que acontece quando UNA é seguida
-            -- de um tipo que não é UNA nem Instrução (ex.: Encerramento de Instrução ou
-            -- Julgamento diretamente, pulando a Instrução), nem o que acontece com Instrução
-            -- quando nem diligência+Encerramento nem "sem diligência+Julgamento" se aplicam.
-            -- Ambos os casos caem aqui por omissão (Adiada) — ver seção 2 do doc de análise.
+            -- TODO(decisão SETIC): o documento não define o que acontece com Instrução quando
+            -- nem diligência+Encerramento nem "sem diligência+Julgamento" se aplicam (nada
+            -- acontece depois). Cai aqui por omissão (Adiada) — ver dúvida #3 em
+            -- docs/DUVIDAS_SETIC_Criterios_Audiencias.md (ainda aguardando SETIC; não
+            -- reformulada como as dúvidas #2/#4 porque não é caso de "avançar de categoria").
             ELSE 'Adiada'
         END AS status
     FROM audiencias_realizadas r

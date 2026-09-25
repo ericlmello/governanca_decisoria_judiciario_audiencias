@@ -26,6 +26,36 @@
 
 ---
 
+## 🔶 Decididas internamente (implementadas; aguardando confirmação formal da SETIC)
+
+### Dúvida #2: UNA Seguida de Tipo Fora do Escopo
+
+**Decisão do usuário (2026-09-24):** "Aplique a regra geral quando não expressa" — UNA seguida de
+Encerramento de Instrução ou Julgamento diretamente (pulando a Instrução) = **Efetiva**, por
+analogia com a regra da Inicial (avançar de categoria = Efetiva).
+
+**Implicação na query v2:** ✅ Já implementado (regra 3d do `CASE` de `classificacao`,
+`audiencias_realizadas_v2_draft.sql`)
+
+**Continua no questionário enviado à SETIC** como pergunta fechada (confirmar/rejeitar a
+hipótese já implementada) — a decisão do usuário destrava a implementação, mas não substitui a
+confirmação formal do negócio sobre uma regra que afeta métrica reportada.
+
+---
+
+### Dúvida #4: Tipo 8 "Instrução e Julgamento"
+
+**Decisão do usuário (2026-09-24):** "Aplique a regra geral quando não expressa" — tipo 8 tem
+regra própria: **sempre Efetiva** (exceto se redesignado como novo tipo 8, que cai na regra geral
+de mesma categoria = Adiada).
+
+**Implicação na query v2:** ✅ Já implementado (regra 1.5 do `CASE` de `classificacao`; tipo 8
+adicionado à população avaliada via novo array `tipo_instrucao_julgamento`)
+
+**Continua no questionário enviado à SETIC** como pergunta fechada, mesmo motivo da dúvida #2.
+
+---
+
 ## ⏳ Pendentes
 
 ### Dúvida #1: UNA e Inicial Sem Nova Audiência
@@ -38,35 +68,11 @@ Exemplo: Inicial → Acordo homologado (sem nova audiência). Efetiva ou Adiada?
 
 ---
 
-### Dúvida #2: UNA Seguida de Tipo Fora do Escopo
-
-Status: **Aguardando resposta** (reformulada como pergunta fechada, com hipótese)
-
-Exemplo: UNA → Encerramento de Instrução designado diretamente (pulando a Instrução).
-
-**Hipótese proposta:** Efetiva, por analogia com a regra da Inicial (avançar de categoria = Efetiva, só repetir a mesma categoria = Adiada). Contraponto: a bipartição UNA→Instrução tem regras propositalmente rígidas por ser considerada suspeita — se este outro salto virasse Efetiva sem escrutínio, seria mais permissivo que a própria bipartição.
-
-**Impacto:** Médio
-
----
-
 ### Dúvida #3: Instrução Sem Diligência e Sem Julgamento
 
 Status: **Aguardando resposta**
 
 Pergunta: Por analogia com UNA, seria Adiada? Ou existe outra regra?
-
-**Impacto:** Médio
-
----
-
-### Dúvida #4: Tipo 8 "Instrução e Julgamento"
-
-Status: **Aguardando resposta** (reformulada como pergunta fechada, com hipótese)
-
-Tipo fora do documento original. Segue a árvore da Instrução ou tem regra própria?
-
-**Hipótese proposta:** Sempre Efetiva (exceto se redesignado como novo tipo 8, que cairia na regra geral de mesma categoria = Adiada) — por já conter o julgamento no mesmo ato, não depende de sinal posterior. Relacionado à dúvida #1 (mesmo princípio: audiência que se resolve sozinha não deveria depender de audiência subsequente).
 
 **Impacto:** Médio
 
@@ -140,27 +146,30 @@ Perguntas:
 
 ---
 
-## Decisões Internas (Já Tomadas, Não Aguardam SETIC)
+## Decisões Internas
 
-| Dúvida | Decisão | Implementada em |
-|--------|---------|-----------------|
-| 7 | Restrito aos 4 tipos listados | `audiencias_realizadas_v2_draft.sql:15` |
-| 9 | RS = Rito Sumário | `audiencias_realizadas_v2_draft.sql:62,68–71` |
+| Dúvida | Decisão | Status | Implementada em |
+|--------|---------|--------|-----------------|
+| 7 | Restrito aos 4 tipos listados | Encerrada, não aguarda SETIC | `audiencias_realizadas_v2_draft.sql:15` |
+| 9 | RS = Rito Sumário | Encerrada, não aguarda SETIC | `audiencias_realizadas_v2_draft.sql:62,68–71` |
+| 2 | UNA → tipo fora do escopo = Efetiva (regra geral) | Implementada; **ainda enviada à SETIC** como pergunta fechada (afeta métrica reportada) | `audiencias_realizadas_v2_draft.sql`, regra 3d do `CASE` |
+| 4 | Tipo 8 "Instrução e Julgamento" = sempre Efetiva (regra geral) | Implementada; **ainda enviada à SETIC** como pergunta fechada (afeta métrica reportada) | `audiencias_realizadas_v2_draft.sql`, regra 1.5 do `CASE` |
 
 ---
 
 ## Próximos Passos
 
-- [ ] Enviar `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` ao SETIC/Negócio
-- [ ] Aguardar respostas (dúvidas #1–8)
+- [x] Enviar `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` ao SETIC/Negócio
+- [x] Implementar hipótese das dúvidas #2 e #4 (decisão do usuário: "regra geral quando não expressa")
+- [ ] Aguardar respostas (dúvidas #1, #2, #3, #4, #5, #6, #8, #10 — #2/#4 já implementadas, aguardam só confirmação formal)
 - [ ] Atualizar este cronograma conforme respostas chegarem
-- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com todas as respostas
+- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes
 - [ ] Implementar tabelas de monitoramento (`fato_audiencia_classificada`, `trilha_execucao`)
 - [ ] Testes com dados reais (~100k audiências)
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-24 (respostas de dúvidas #7 e #9)
+**Última atualização:** 2026-09-25 (dúvidas #2 e #4 decididas e implementadas — "regra geral quando não expressa")
 
-**Próxima revisão:** Quando dúvidas críticas (#1–6) forem respondidas
+**Próxima revisão:** Quando dúvidas críticas (#1, #3, #5, #6) forem respondidas

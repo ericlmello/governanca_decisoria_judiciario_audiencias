@@ -550,15 +550,25 @@ em cada execução também ajuda a auditar esse tipo de perda).
 1. **UNA e Inicial sem nova audiência** — UNA sem redesignação e sem bipartição, mas com sentença
    ou acordo; Inicial com acordo homologado ou arquivamento — são Efetivas? (A original as marcava
    Efetivas; a v2, pela letra do documento, as marca Adiadas.)
-2. **UNA seguida de tipo que não é UNA nem Instrução** (Encerramento ou Julgamento direto).
-3. **Instrução sem diligência e sem Julgamento designado** — Adiada por analogia com a UNA?
-4. **Tipo 8 "Instrução e Julgamento"** — segue a árvore da Instrução ou regra própria?
+2. ~~**UNA seguida de tipo que não é UNA nem Instrução**~~ — **DECIDIDO pelo usuário** ("aplique a
+   regra geral quando não expressa"): Efetiva, por analogia com a regra da Inicial. Implementado
+   na regra 3d do `CASE` (`sql/audiencias_realizadas_v2_draft.sql`). Ainda enviado à SETIC como
+   pergunta fechada (confirmar/rejeitar a hipótese já implementada) — ver dúvida #2.
+3. **Instrução sem diligência e sem Julgamento designado** — Adiada por analogia com a UNA? (Não
+   reformulada como #2/#4 — não é caso de "avançar de categoria", segue pendente.)
+4. ~~**Tipo 8 "Instrução e Julgamento"**~~ — **DECIDIDO pelo usuário** ("aplique a regra geral
+   quando não expressa"): regra própria, sempre Efetiva (exceto redesignação de mesma categoria).
+   Implementado na regra 1.5 do `CASE`. Ainda enviado à SETIC como pergunta fechada — ver dúvida
+   #4.
 5. **Sentença terminativa** conta como "prolação de sentença"? (A original contava — item 6.)
 6. **Perícia ativa: avaliada em que momento?** No fim da janela de 3 dias úteis (determinístico)
    ou na data de apuração (como hoje)? E precisa ter sido marcada dentro da janela?
-7. **"Qualquer audiência subsequente" da Inicial** — só os quatro tipos listados ou qualquer tipo?
+7. ~~**"Qualquer audiência subsequente" da Inicial**~~ — **RESPONDIDO pela SETIC:** restrito aos
+   quatro tipos listados. Já implementado.
 8. **Dias úteis — abrangência municipal** entra no cálculo?
-9. *(informativo)* ids 7/9 "RS" foram tratados como Rito Sumário (UNA) por inferência — confirmar.
+9. ~~*(informativo)* ids 7/9 "RS"~~ — **RESPONDIDO pela SETIC:** confirmado, "RS" = Rito Sumário.
+   Já implementado.
+10. **Watermark autorreferente** (`VAR_ULT_DT_AUDIENCIA`) — ver seção 7.0.
 
 **Decisões internas (não são para a SETIC):** manter ou retirar `magistrado`; manter
 `dt_ult_mov` só se o UNION da pauta programada exigir; adotar o reprocessamento com sobra + upsert.
