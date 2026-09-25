@@ -104,6 +104,29 @@ Se suspensão vale só em 1 município, deve contar como não-útil:
 
 ---
 
+### Dúvida #10: Watermark de Carga (`VAR_ULT_DT_AUDIENCIA`) Autorreferente
+
+Status: **Aguardando resposta**
+
+Confirmado pelo usuário que a variável vem de:
+```sql
+SELECT MAX(dt_audiencia) AS ultima_dt
+FROM pai_2_0.audiencias
+WHERE status <> 'Programada'
+```
+
+Watermark lido da própria tabela de destino → risco de perda silenciosa de audiências
+cujas janelas de 3 dias úteis fecham depois de outras do mesmo dia (calendário varia por vara).
+
+Perguntas:
+1. É um padrão intencional/conhecido ou não documentado?
+2. Existe reprocessamento/backfill já em uso?
+3. Existe auditoria periódica que detectaria essa lacuna?
+
+**Impacto:** Alto (perda de dados sem alerta — não é regra de negócio, é mecanismo de carga)
+
+---
+
 ## Processo de Consolidação
 
 1. **Documento enviado:** `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (2026-09-24)

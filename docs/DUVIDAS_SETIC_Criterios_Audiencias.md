@@ -238,6 +238,39 @@ Confirmar: "RS" = "Rito Sumário" (correto) ou significa outra coisa? Se incorre
 
 ---
 
+## 10. Watermark de Carga (`VAR_ULT_DT_AUDIENCIA`) É Autorreferente — Risco de Perda Silenciosa
+**Seção do documento:** Não se aplica às regras de negócio — é sobre o mecanismo de carga incremental que alimenta a tabela `pai_2_0.audiencias`.
+
+### Contexto:
+A variável que delimita a carga incremental (`VAR_ULT_DT_AUDIENCIA`) é obtida com:
+```sql
+-- maior data de audiência excluindo as programadas
+SELECT MAX(dt_audiencia) AS ultima_dt
+FROM pai_2_0.audiencias
+WHERE status <> 'Programada'
+```
+Ou seja, o valor é lido **da própria tabela de destino** que a carga grava (padrão "watermark autorreferente"), não de um parâmetro/controle externo independente.
+
+### Por que isso é um risco:
+- O limite de "3 dias úteis" varia por vara/comarca (calendário local de suspensão de prazo/audiência).
+- Duas audiências do **mesmo dia**, em varas diferentes, podem ter janelas de 3 dias úteis fechando em datas diferentes.
+- Assim que **qualquer** audiência daquele dia (ou de dia posterior) for gravada em `pai_2_0.audiencias`, o `MAX(dt_audiencia)` avança.
+- A partir daí, o filtro `dt_inicio > ultima_dt` passa a **excluir permanentemente** qualquer outra audiência daquele mesmo dia que ainda não tenha sido processada — mesmo que a janela dela feche depois.
+- Não há mecanismo de retry: uma vez que o `MAX` ultrapassa uma data, ela nunca mais volta a ser candidata na carga seguinte.
+
+### Consequência prática:
+Perda **silenciosa** de audiências — sem erro, sem log de falha, elas simplesmente nunca aparecem no resultado. É mais provável perto de janelas divergentes entre varas (ex.: recesso forense não afeta todas as comarcas de forma uniforme).
+
+### Pergunta:
+1. Esse padrão de watermark autorreferente é **intencional** (aceita esse risco como conhecido) ou é um comportamento não documentado da carga atual?
+2. Existe algum mecanismo de reprocessamento/backfill já em uso para mitigar esse tipo de perda (ex.: reprocessar os últimos N dias a cada carga, upsert por chave)?
+3. Há alguma auditoria/reconciliação periódica que compare a população total de audiências elegíveis (`pje`) com o que foi de fato carregado em `pai_2_0.audiencias`, capaz de detectar esse tipo de lacuna?
+
+### Impacto técnico:
+Recomendação já adotada na v2 (aguardando confirmação do padrão de carga): trocar o corte exato por uma **sobra de segurança** (ex.: `MAX(dt_audiencia) - 45 dias`, não o valor exato) combinada com **upsert** na chave `(id_processo_audiencia, versao_regra)`, para que reprocessar um período já carregado apenas atualize (sem duplicar) e audiências "esquecidas" voltem a ser avaliadas em cargas futuras.
+
+---
+
 ## Anexo: Tabela de Referência Rápida
 
 | # | Assunto | Linha do Documento | Status na v2 | Risco |
@@ -251,6 +284,7 @@ Confirmar: "RS" = "Rito Sumário" (correto) ou significa outra coisa? Se incorre
 | 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | Restrito aos 4 tipos | **Baixo** (improvável conflito real) |
 | 8 | Dias úteis + abrangência municipal | 62–67 | Ignora município | **Baixo** (edge case) |
 | 9 | [Informativo] RS = Rito Sumário | Escopo | Assumido como Rito Sumário | **Baixo** (semântica) |
+| 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | Herda o padrão atual (`MAX(dt_audiencia)` exato) | **Alto** (perda de dados sem alerta) |
 
 ---
 
