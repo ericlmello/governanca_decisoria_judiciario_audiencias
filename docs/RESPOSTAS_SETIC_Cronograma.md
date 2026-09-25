@@ -163,13 +163,14 @@ Perguntas:
 - [x] Implementar hipótese das dúvidas #2 e #4 (decisão do usuário: "regra geral quando não expressa")
 - [ ] Aguardar respostas (dúvidas #1, #2, #3, #4, #5, #6, #8, #10 — #2/#4 já implementadas, aguardam só confirmação formal)
 - [ ] Atualizar este cronograma conforme respostas chegarem
-- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes
-- [ ] Implementar tabelas de monitoramento (`fato_audiencia_classificada`, `trilha_execucao`)
-- [ ] Testes com dados reais (~100k audiências)
+- [x] **FASE 3 (Testes):** Criar plano abrangente — `docs/PLANO_TESTES_FASE_3.md` (40+ casos de teste, bloqueadores identificados)
+- [x] **FASE 4 (Monitoramento):** Implementar tabelas `fato_audiencia_classificada`, `trilha_execucao`, `metrica_integridade` — `sql/tabelas_monitoramento_fase4.sql`
+- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#1, #3, #5, #6)
+- [ ] Testes com dados reais (~100k audiências) — ativado após respostas SETIC
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-25 (dúvidas #2 e #4 decididas e implementadas — "regra geral quando não expressa")
+**Última atualização:** 2026-09-25 (Fase 3 e Fase 4 planejadas e estruturadas em paralelo)
 
 **Próxima revisão:** Quando dúvidas críticas (#1, #3, #5, #6) forem respondidas
