@@ -6,6 +6,25 @@
 
 ## ✅ Resolvidas
 
+### Dúvida #2: Perícia Ativa — Avaliada Quando?
+
+**Resposta:** Opção **(c) Marcada dentro da janela, independente de status atual**
+
+Uma perícia conta como "diligência ativa" (sinal de Efetiva) se foi MARCADA (dt_marcacao) dentro da janela de 3 dias úteis, independente de:
+- Se será finalizada depois (status muda após a janela)
+- Se prazo vencer depois (reprocessar pode mudar)
+- Status atual da perícia quando reavaliada
+
+**Implicação na query v2:** ✅ Já implementado e verificado (verifica `pp.dt_marcacao BETWEEN [início] AND [limite_3du]`, linha 356 em `audiencias_realizadas_v2_draft.sql`)
+
+**Ações completadas:**
+- ✅ TODO(confirmar) removido (linhas 307-312, agora comentário documentado)
+- ✅ Implementação validada como correta
+
+**Data da resposta:** 2026-09-25
+
+---
+
 ### Dúvida #7: "Qualquer Audiência Subsequente" da Inicial — Literal ou Restrito?
 
 **Resposta:** Restrito aos 4 tipos listados (UNA, Instrução, Encerramento de Instrução, Julgamento)
@@ -88,19 +107,6 @@ Exemplo: Extinção do processo sem resolução do mérito. Vale como sinal de E
 
 ---
 
-### Dúvida #6: Perícia Ativa — Avaliada Quando?
-
-Status: **Aguardando resposta**
-
-Opções:
-- **(a) Data de apuração (hoje)** — reprocessar pode mudar histórico
-- **(b) Final da janela de 3 dias úteis** — determinístico
-- **(c) Marcada dentro da janela, independente de status atual** — apenas iniciar
-
-**Impacto:** Médio (define semântica de reprocessamento)
-
----
-
 ### Dúvida #8: Dias Úteis — Abrangência Municipal
 
 Status: **Aguardando resposta**
@@ -161,16 +167,17 @@ Perguntas:
 
 - [x] Enviar `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` ao SETIC/Negócio
 - [x] Implementar hipótese das dúvidas #2 e #4 (decisão do usuário: "regra geral quando não expressa")
-- [ ] Aguardar respostas (dúvidas #1, #2, #3, #4, #5, #6, #8, #10 — #2/#4 já implementadas, aguardam só confirmação formal)
-- [ ] Atualizar este cronograma conforme respostas chegarem
+- [x] **Dúvida #2 respondida e TODO removido** (2026-09-25)
+- [ ] Aguardar respostas (dúvidas #1, #3, #4, #5, #8, #10 — #4 ainda aguarda confirmação formal)
+- [x] Atualizar este cronograma conforme respostas chegarem
 - [x] **FASE 3 (Testes):** Criar plano abrangente — `docs/PLANO_TESTES_FASE_3.md` (40+ casos de teste, bloqueadores identificados)
 - [x] **FASE 4 (Monitoramento):** Implementar tabelas `fato_audiencia_classificada`, `trilha_execucao`, `metrica_integridade` — `sql/tabelas_monitoramento_fase4.sql`
-- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#1, #3, #5, #6)
+- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#1, #3, #5, #8)
 - [ ] Testes com dados reais (~100k audiências) — ativado após respostas SETIC
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-25 (Fase 3 e Fase 4 planejadas e estruturadas em paralelo)
+**Última atualização:** 2026-09-25 (Dúvida #2 respondida e implementada; TODO removido)
 
-**Próxima revisão:** Quando dúvidas críticas (#1, #3, #5, #6) forem respondidas
+**Próxima revisão:** Quando dúvidas críticas (#1, #3, #5, #8) forem respondidas; decisão formal SETIC em #4 (Watermark)

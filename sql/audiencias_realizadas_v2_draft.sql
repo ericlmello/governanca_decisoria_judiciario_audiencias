@@ -304,14 +304,10 @@ calendario_3du AS (
 -- interpretado depois). Aqui só entra a perícia ATIVA (laudo em aberto) com PRAZO VÁLIDO;
 -- prazo vencido segue as regras do painel de perícias do PAI (fora de escopo, conforme já
 -- definido na seção 2.5/regra 5 do cabeçalho deste arquivo).
--- TODO(confirmar): a janela de 3 dias úteis se aplica à DATA DE MARCAÇÃO da perícia
--- (pp.dt_marcacao), como para os demais diligências? Diferente de expedição de documento
--- (ato pontual), perícia é um estado contínuo — pode fazer mais sentido contar como "ativa"
--- independente de quando foi marcada, desde que aberta e com prazo válido na data de
--- referência. Mantido com o mesmo critério de janela por consistência com os outros
--- movimentos, até confirmação.
--- Decidido pelo usuário: referência de "prazo válido" = CURRENT_DATE - 1 dia, igual à "Data de
--- referência do relatório" do painel de perícias original.
+-- Perícia MARCADA dentro da janela de 3 dias úteis (pp.dt_marcacao) conta como diligência,
+-- independente de status ou prazo posterior (Resposta SETIC Dúvida #2).
+-- Referência de "prazo válido" = CURRENT_DATE - 1 dia, igual à "Data de referência do relatório"
+-- do painel de perícias original.
 movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
