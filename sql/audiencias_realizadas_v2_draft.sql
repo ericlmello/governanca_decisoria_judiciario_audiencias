@@ -86,12 +86,19 @@
  *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
  *   Prolação de sentença ......... 219, 220, 221, 50110, 50118 (julgamento de mérito, 1º grau)
  *   Homologação de acordo ........ 466 (Homologada a transação)
- *   Expedição ofício/carta precatória/mandado .. 60 (+ ds_texto_final_externo ILIKE por tipo)
+ *   Expedição ofício/carta precatória/mandado .. NÃO é movimento em tb_processo_evento; vem de
+ *                                  tb_processo_expediente.id_tipo_processo_documento, join com
+ *                                  tb_tipo_processo_documento.ds_tipo_processo_documento ILIKE
+ *                                  ANY ('Ofício%', 'Carta Precatória%', 'Mandado%') — filtro por
+ *                                  prefixo no catálogo estruturado (não mais no texto livre do
+ *                                  evento). ds_origem_expediente não diferencia por tipo de
+ *                                  documento (é canal de geração, não tipo de ato).
  *   Perícia ativa ................ não é movimento em tb_processo_evento; vem de
  *                                  tb_processo_pericia (query do painel de perícias do PAI,
  *                                  fornecida pelo usuário) — status aberto (L/S/A/M) +
  *                                  prazo válido (tb_proc_parte_expediente.dt_prazo_legal_parte
- *                                  >= CURRENT_DATE)
+ *                                  >= CURRENT_DATE). Mesma tabela tb_processo_expediente da
+ *                                  diligência acima, via ds_origem_expediente = 'PERICIA'.
  *
  * DECIDIDO pelo usuário ("mantém"): os ids 941 (Declarada a incompetência) e 371 (Acolhida a
  * exceção de incompetência) — sinal legado da query ORIGINAL (`OR e.id_evento IN (941, 371)`) —
@@ -261,14 +268,20 @@ calendario_3du AS (
 
 -- Movimentos de diligência (perícia ativa, ofício, carta precatória, mandado)
 -- em até 3 dias úteis após a audiência.
--- Achado (amostra de tb_evento_processual devolvida pelo usuário): ofício, carta precatória
--- e mandado são todos instâncias do MESMO movimento genérico da TPU/CNJ
--- "60 Expedido(a) #{tipo de documento} a(o) #{destinatário}" — o tipo real só existe no texto
--- resolvido (tpe.ds_texto_final_externo), não no catálogo (ds_movimento mantém o placeholder).
--- Por isso o filtro usa o código 60 + ILIKE no texto final, e não mais join com
--- tb_evento/tb_evento_processual.
--- TODO(confirmar): existe tabela de complemento/parâmetro estruturada para "tipo de
--- documento" (mais robusta que ILIKE em texto livre)? Não localizada na amostra devolvida.
+-- RESOLVIDO: existe tabela de complemento estruturada — tb_processo_expediente
+-- (id_processo_trf, dt_criacao_expediente, id_tipo_processo_documento), que já era usada
+-- aqui mesmo para perícia (join via tb_proc_parte_expediente). O campo id_tipo_processo_documento
+-- referencia tb_tipo_processo_documento (id_tipo_processo_documento, ds_tipo_processo_documento,
+-- in_ativo), que tem os tipos ofício/carta precatória/mandado — inclusive vários subtipos
+-- específicos e ativos (ex.: "Mandado de Citação", "Carta Precatória Executória", "Ofício
+-- Precatório"), então o filtro usa ILIKE por PREFIXO no nome canônico (não no texto livre do
+-- evento), o que é robusto porque o vocabulário é controlado (catálogo), não texto digitado.
+-- ds_origem_expediente NÃO diferencia por tipo de documento (valores confirmados: LEGADO,
+-- INTIMACAO_AUTOMATICA, NOTIFICACAO_EXPRESSA, PEC_FLUXO, PEC_MENU, PERICIA) — é outra dimensão
+-- (canal/origem de geração do expediente), por isso a diferenciação usa
+-- tb_tipo_processo_documento, não esse campo.
+-- Abandonado: o filtro anterior via tb_processo_evento (id_evento = 60 + ILIKE em
+-- ds_texto_final_externo) não é mais necessário para este sinal.
 --
 -- Perícia ativa: query do "painel de perícias do PAI" fornecida pelo usuário (mesma consulta
 -- usada tanto para prazo válido quanto vencido — a diferença está em como o prazo é
@@ -287,12 +300,13 @@ movimentos_diligencia AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
     INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = r.id_processo_audiencia
-    INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
-    WHERE tpe.dt_atualizacao BETWEEN date_trunc('day', r.dta_audiencia::date)
+    INNER JOIN pje.tb_processo_expediente pex ON pex.id_processo_trf = r.num_proc_id_origem
+    INNER JOIN pje.tb_tipo_processo_documento tpd
+        ON tpd.id_tipo_processo_documento = pex.id_tipo_processo_documento
+    WHERE pex.dt_criacao_expediente BETWEEN date_trunc('day', r.dta_audiencia::date)
         AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
-        AND tpe.id_evento = 60 -- Expedido(a) #{tipo de documento} a(o) #{destinatário}
-        AND tpe.ds_texto_final_externo ILIKE ANY (ARRAY[
-            '%Ofício%', '%Carta Precatória%', '%Mandado%'
+        AND tpd.ds_tipo_processo_documento ILIKE ANY (ARRAY[
+            'Ofício%', 'Carta Precatória%', 'Mandado%'
         ])
 
     UNION

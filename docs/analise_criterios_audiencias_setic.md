@@ -236,7 +236,7 @@ mais `ILIKE` no catálogo:
 | Conclusão para sentença | `51` | "Conclusos os autos para #{tipo de conclusão}..." — mesma lógica da query original: `ds_texto_final_externo ILIKE '%sentença%'` sobre o texto **resolvido**, já que o tipo de conclusão é parâmetro |
 | Prolação de sentença | `219, 220, 221, 50110, 50118` | Não existe um movimento literal "Prolação de sentença"; o julgamento de mérito em 1º grau aparece como resultado específico (procedente/improcedente/procedente em parte/julgado antecipadamente/liminarmente improcedente) |
 | Homologação de acordo | `466` | Não existe texto literal "Homologação de acordo"; o termo técnico trabalhista é "transação" — `466 Homologada a transação (Valor da transação: ...)` |
-| Expedição de ofício / carta precatória / mandado | `60` (mesmo código para os três) | "Expedido(a) #{tipo de documento} a(o) #{destinatário}" — os três tipos são a MESMA movimentação genérica; só dá pra diferenciar pelo texto resolvido (`ds_texto_final_externo ILIKE '%Ofício%'` / `'%Carta Precatória%'` / `'%Mandado%'`) |
+| Expedição de ofício / carta precatória / mandado | — (ver seção 3.5, **não é mais via `tb_evento_processual`**) | O código `60` ("Expedido(a) #{tipo de documento} a(o) #{destinatário}") ainda existe, mas foi abandonado como fonte deste sinal — resolvido por tabela estruturada, ver seção 3.5 |
 | Perícia ativa | — | Nenhum movimento correspondente na amostra de `tb_evento_processual` — resolvido por outra via, ver seção 3.3 (`tb_processo_pericia`) |
 
 **Achado extra, sobre a query ORIGINAL (não o rascunho):** os ids `941` e `371`, usados nela
@@ -272,6 +272,46 @@ mérito (219/220/221/50110/50118). **Perguntei ao usuário; a resposta foi "prec
 a SETIC"** — os códigos terminativos ficam comentados (não ativos) em
 `movimentos_julgamento`, prontos para descomentar quando a decisão vier.
 
+## 3.5 Ofício/Carta Precatória/Mandado — resolvido (`tb_processo_expediente` + `tb_tipo_processo_documento`)
+
+**Pergunta original:** o código de movimento `60` ("Expedido(a) #{tipo de documento} a(o)
+#{destinatário}") é genérico para os três tipos — o texto do tipo de documento só existe
+resolvido (`ds_texto_final_externo`), não no catálogo. Existiria alguma tabela de complemento
+estruturada, mais robusta que `ILIKE` em texto livre? (query de descoberta 4.2.2, abaixo)
+
+**Investigação (usuário rodou as queries manualmente):**
+
+1. Busca por qualquer coluna em `pje` chamada `id_tipo_processo_documento` (convenção PJe de
+   nomear FK igual à PK) encontrou várias tabelas candidatas, entre elas
+   `tb_processo_expediente` — que **já era usada** na CTE `movimentos_diligencia` para perícia
+   (join via `tb_proc_parte_expediente`).
+2. Estrutura de `tb_processo_expediente` confirmada: tem `id_processo_trf` (liga direto ao
+   processo, mesmo campo já usado no resto da query), `dt_criacao_expediente` (data do
+   expediente, substitui `tpe.dt_atualizacao`) e `id_tipo_processo_documento` (FK para
+   `tb_tipo_processo_documento`).
+3. `tb_tipo_processo_documento` (`id_tipo_processo_documento`, `ds_tipo_processo_documento`,
+   `in_ativo`) tem os três tipos — e mais granular do que o documento SETIC sugere: além dos
+   genéricos `Mandado` (id 81, ativo) e `Ofício` (id 34, ativo), existem ~15 subtipos específicos
+   de Mandado (Citação, Penhora, Busca e Apreensão, etc., a maioria ativa), e `Carta Precatória`
+   genérica (id 79) está **inativa** — hoje só as subtipadas (Executória/Inquiritória/
+   Notificatória) estão ativas.
+4. Verificado que `ds_origem_expediente` (já usado para filtrar perícia, `= 'PERICIA'`) **não**
+   diferencia por tipo de documento — valores confirmados: `INTIMACAO_AUTOMATICA`, `LEGADO`,
+   `NOTIFICACAO_EXPRESSA`, `PEC_FLUXO`, `PEC_MENU`, `PERICIA`. É outra dimensão (canal/origem de
+   geração do expediente), não o tipo do ato.
+
+**Implementado** na CTE `movimentos_diligencia` (primeiro `SELECT` do `UNION`, em
+`sql/audiencias_realizadas_v2_draft.sql`): join `tb_processo_expediente` →
+`tb_tipo_processo_documento`, filtro `ds_tipo_processo_documento ILIKE ANY ('Ofício%', 'Carta
+Precatória%', 'Mandado%')` — por **prefixo**, não igualdade exata, para cobrir os subtipos.
+Robusto porque o campo é vocabulário controlado (catálogo), não texto livre digitado por
+servidor/magistrado. Abandonado o filtro anterior via `tb_processo_evento`
+(`id_evento = 60` + `ILIKE` em `ds_texto_final_externo`).
+
+**Nota:** `in_ativo = 'N'` em alguns tipos (ex.: `Carta Precatória` genérica) não foi usado como
+filtro — são movimentos **históricos** já ocorridos; o fato de o tipo estar desativado para
+*novos* documentos hoje não invalida uma expedição passada que o usou.
+
 ## 4. Queries de descoberta (rodar contra `pje_1grau_cds` quando houver acesso)
 
 ```sql
@@ -288,8 +328,9 @@ SELECT id_evento_processual, cd_evento, ds_movimento
 FROM pje.tb_evento_processual
 WHERE id_evento_processual IN (51, 60, 219, 220, 221, 466, 941, 371, 50110, 50118);
 
--- 4.2.2 Localizar tabela de complemento que guarde o "tipo de documento" expedido de forma
--- estruturada (ofício/carta precatória/mandado), como alternativa ao ILIKE em texto livre
+-- 4.2.2 [RESOLVIDA] Tabela de complemento para "tipo de documento" expedido — era
+-- tb_processo_expediente.id_tipo_processo_documento + tb_tipo_processo_documento, ver seção 3.5.
+-- Query original mantida aqui só para referência de como foi localizada:
 SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_schema = 'pje'
@@ -345,8 +386,12 @@ ORDER BY dt_ano;
    máxima (CTE `incompetencia_na_janela`), ver seção 3.2.
 3.5 ~~Janela de 3 dias úteis aplicada só onde o documento determina~~ — decidido: Regra Geral e
    Inicial não têm janela; já implementado assim (nenhuma mudança necessária).
-3.6 ~~`7`/`9` "...RS"~~ — decidido: entram no grupo UNA (hipótese "Rito Sumário", não confirmada
-   contra o banco), já aplicado no array `tipo_una`.
+3.6 ~~`7`/`9` "...RS"~~ — decidido: entram no grupo UNA. **Confirmado pelo usuário:** "RS" =
+   Rito Sumário, já aplicado no array `tipo_una`.
+3.7 ~~Tabela de complemento para "tipo de documento" expedido (ofício/carta precatória/
+   mandado)~~ — ver seção 3.5: `tb_processo_expediente.id_tipo_processo_documento` +
+   `tb_tipo_processo_documento`, filtro por prefixo no nome canônico. Substituído o `ILIKE` em
+   texto livre por join estruturado, aplicado na CTE `movimentos_diligencia`.
 
 **Ainda pendente:**
 4. `8` "Instrução e Julgamento" — segue a árvore da Instrução (detalhada na conversa) ou tem
@@ -363,9 +408,6 @@ ORDER BY dt_ano;
    seção 3.3; a referência de prazo válido já foi decidida: `CURRENT_DATE - 1 dia`).
 7.1 Confirmar com a SETIC a abrangência municipal (`id_municipio`) da regra de dia útil — hoje
    só cobre nacional + estado de SP (ver seção 3.1).
-8. Rodar a query 4.2.2 para checar se existe uma tabela de complemento estruturada para "tipo de
-   documento" expedido (alternativa mais robusta ao `ILIKE` em `ds_texto_final_externo` usado
-   hoje para diferenciar ofício/carta precatória/mandado, todos sob o código `60`).
 9. Com os pontos acima resolvidos, finalizar `sql/audiencias_realizadas_v2_draft.sql`
    substituindo os `-- TODO(confirmar)`/`-- TODO(decisão)` restantes e testar contra casos
    reais conhecidos (audiências já classificadas manualmente, se houver).
