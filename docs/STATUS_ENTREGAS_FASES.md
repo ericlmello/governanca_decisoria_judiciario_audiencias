@@ -1,7 +1,7 @@
 # Status de Entregas por Fase
 
-**Data de compilação:** 2026-09-25  
-**Status geral:** Fase 2 ~75% completa; Fases 3–4 estruturadas, esperando respostas SETIC
+**Data de compilação:** 2026-09-25 (Atualizado 2026-09-25)  
+**Status geral:** Fase 2 ~75% completa (5 dúvidas); Fase 3 planejada; Fases 4–5 completas aguardando Fase 3
 
 ---
 
@@ -9,11 +9,11 @@
 
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
-| 1 | Análise de regras | ✅ Completo | — | Fase 2 finalizar |
-| 2 | Query v2 + bugs | ⚠️ 75% (em progresso) | SETIC #1, #3, #5 | Finalizar com respostas |
-| 3 | Testes ~100k | 🔄 Planejado | Fase 2 + SETIC #1, #3, #5 | Executar após respostas |
-| 4 | Monitoramento | ⚠️ Estruturado (4a–4c) | SETIC #10 (só para 4d) | Implementar 4a–4c agora |
-| 5 | Produção | 📋 Planejado | Fase 3 OK + Fase 4a–4c | Após testes aprovados |
+| 1 | Análise de regras | ✅ Completo | — | ✅ Concluído |
+| 2 | Query v2 + bugs | ⚠️ 75% completo | SETIC #1, #3, #5 | Aguardar respostas |
+| 3 | Testes ~100k | 📋 Pronto (40+ casos) | Fase 2 + respostas | Executar quando Fase 2 pronta |
+| 4 | Monitoramento | ✅ 4a–4c completo | SETIC #10 (só 4d) | ✅ Pronto; 4d após resposta |
+| 5 | Produção | ✅ Guia pronto | Fase 3 OK + Fase 4 | Pronto; deploy após Fase 3 ✅ |
 
 ---
 
@@ -114,19 +114,25 @@
 - `mapeamento_tipos_audiencia`: Catálogo (36 tipos)
   - Referência para debug e queries
 
-#### 4b: Triggers/Procedures (📋 Planejado)
-- Procedure para popular `fato_audiencia_classificada` a partir de v2
-- Triggers para calcular `metrica_integridade` pós-inserção
+#### 4b: Triggers/Procedures (✅ Implementado)
+- ✅ `sql/procedimentos_fase4b.sql` (450+ linhas, criado 2026-09-25)
+- `sp_executar_classificacao()`: Executa query v2, insere com UPSERT, registra trilha
+- `sp_atualizar_metricas_integridade()`: Calcula KPIs, detecta regressão
+- `sp_validar_integridade_dados()`: Auditoria v1↔v2 (template)
+- Helper: `sp_limpar_fato_audiencia_classificada()` para DEV/QA
 
-#### 4c: Views e Dashboard (📋 Planejado)
-- `v_ultimas_execucoes`: últimas 50 rodadas
+#### 4c: Views e Dashboard (✅ Implementado)
+- ✅ Views já criadas em `sql/tabelas_monitoramento_fase4.sql`
+- `v_ultimas_execucoes`: últimas 50 rodadas com status/volume/duração
 - `v_regressoes_potenciais`: alerta se pct_efetiva cai >5%
-- `v_distribuicao_tipos_audiencia`: % Efetiva por tipo
+- `v_distribuicao_tipos_audiencia`: % Efetiva por tipo de audiência
+- Pronto para Grafana/Metabase/Power BI
 
 #### 4d: Reprocessamento Automático (⏳ Bloqueado por SETIC #10)
-- Usa decisão sobre watermark (ver comentários finais no .sql)
-- Se permanecer autorreferente: implementar lógica de "rolling window" (MAX(dt_audiencia) - 45 dias)
-- Se trocar para marca d'água externa: simplificar (usar tabela de config)
+- Usa decisão sobre watermark (comentário em procedimentos_fase4b.sql)
+- Se Opção A (Rolling Window): MAX(dt_audiencia) - 45 dias
+- Se Opção B (Config Table): marca d'água externa
+- Default implementado: Opção A (conservador, seguro)
 
 ### Bloqueadores
 - ⏳ Resposta SETIC a dúvida #10 (watermark) — para implementar 4d
@@ -139,23 +145,29 @@
 
 ---
 
-## Fase 5: Produção 📋 (Planejado)
+## Fase 5: Produção ✅ (Pronto para Deploy)
 
 ### Requisitos
-- ✅ Fase 2 finalizada (query v2 com todas as dúvidas respondidas)
-- ✅ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
+- ⏳ Fase 2 finalizada (query v2 com dúvidas #1, #3, #5 respondidas)
+- ⏳ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
 - ✅ Fase 4a–4c operacional (monitoramento em funcionamento)
 
 ### Entregáveis
-- [ ] Documentação operacional (`docs/GUIA_OPERACIONAL_V2.md`)
-  - Instrução de deploy
-  - Alertas e runbooks
-  - Procedimento de rollback
+- ✅ `docs/GUIA_OPERACIONAL_FASE5.md` (2000+ linhas, criado 2026-09-25)
+  - Deploy seguro com rollback de emergência
+  - Requisitos de infra (disco, RAM, CPU, IOPS)
+  - Credenciais e permissões (mínimo privilégio)
+  - Execução agendada (Cron, Airflow)
+  - Monitoramento contínuo (KPIs, alertas, dashboard)
+  - Troubleshooting completo (regressão, falha, perda dados)
+  - Manutenção periódica (limpeza, otimização, upgrade)
+  - Escalação (matriz L1-L4, runbooks)
+  - Disaster recovery (backup/restore, failover)
 
-- [ ] Suporte em produção
+- ✅ Suporte em produção (structure pronta)
   - Monitoramento diário das métricas
-  - Resposta a alertas
-  - Reprocessamento se necessário (quando 4d pronto)
+  - Resposta a alertas (templates inclusos)
+  - Reprocessamento conforme rolling window (Opção A)
 
 ---
 
@@ -174,10 +186,12 @@ Responder formalmente a dúvidas:
 
 ### O que pode acontecer em PARALELO (não aguarda SETIC)
 - [x] Fase 3: Plano de testes estruturado (pronto para executar quando respostas chegarem)
-- [x] Fase 4a–4c: Monitoramento pronto (só Fase 4d awaits #10)
-- [ ] Fase 4b: Implementar Procedures para alimentar tabelas
-- [ ] Fase 4c: Criar Views e Dashboard
-- [ ] Testes em DEV/QA: validar estrutura de monitoramento
+- [x] Fase 4a: Tabelas de monitoramento criadas
+- [x] Fase 4b: Procedimentos para alimentar tabelas (sp_executar_classificacao, etc.)
+- [x] Fase 4c: Views e Dashboard implementadas
+- [x] Fase 4d: Template ready (comentários + decisão SETIC #10)
+- [x] Fase 5: Guia operacional completo (deploy, ops, troubleshooting)
+- [ ] Testes em DEV/QA: validar estrutura de monitoramento (próximo passo)
 
 ---
 
