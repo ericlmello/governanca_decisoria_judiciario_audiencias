@@ -23,7 +23,10 @@
  * e como tipo de audiência subsequente válido (Inicial); UNA/Instrução que pulam direto para
  * Encerramento de Instrução (sem diligência) agora seguem a MESMA avaliação da bipartição
  * (antes caíam automaticamente em Efetiva pela regra "avança de categoria").
- * Ainda pendentes: Dúvida #4/#10 (watermark autorreferente) e Dúvida #8 (calendário municipal).
+ * Dúvida #4 (tipo 8 "Instrução e Julgamento" sempre Efetiva) -> RESPONDIDA "Sim" pela SETIC em
+ * 2026-09-29 (confirmação por email, fora do documento). Hipótese passa de "não confirmada" para
+ * "confirmada" nos comentários abaixo.
+ * Ainda pendentes: Dúvida #10 (watermark autorreferente) e Dúvida #8 (calendário municipal).
  * NOVA dúvida introduzida por esta atualização: mapeamento exato de "Conciliação" (usamos
  * Conciliação em Conhecimento — ids 1/32/20/33 — não Conciliação em Execução), a confirmar.
  *
@@ -50,7 +53,7 @@
  *      prazo VENCIDO não é tratada aqui (regra pertence ao painel de perícias do PAI —
  *      dependência externa, fora de escopo).
  *   6. Tipo 8 "Instrução e Julgamento": regra própria, sempre EFETIVA (exceto redesignação de
- *      mesma categoria, regra 1) -> DECIDIDO pelo usuário, hipótese não confirmada pela SETIC.
+ *      mesma categoria, regra 1) -> ✅ CONFIRMADA PELA SETIC (2026-09-29).
  *   7. UNA seguida de tipo que não é UNA nem Instrução/Encerramento de Instrução (ex.:
  *      Julgamento ou Conciliação direto) -> EFETIVA -> DECIDIDO pelo usuário, hipótese não
  *      confirmada pela SETIC.
@@ -119,12 +122,11 @@
  * da população avaliada. Já implementado assim (o WHERE de audiencias_realizadas inclui só
  * tipo_inicial/tipo_una/tipo_instrucao/tipo_instrucao_julgamento) — nenhuma mudança necessária.
  *
- * DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): tipo 8 "Instrução e
- * Julgamento" (audiência única que já conclui com julgamento no mesmo ato) tem regra própria —
- * sempre EFETIVA, exceto redesignação de mesma categoria (regra geral, prioridade). NÃO segue a
- * árvore normal da Instrução (não depende de diligência/Encerramento/sinal posterior, porque o
- * julgamento já ocorreu no próprio ato). Hipótese ainda não confirmada pela SETIC — ver dúvida #4
- * em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ * ✅ CONFIRMADO PELA SETIC (2026-09-29, Dúvida #4): tipo 8 "Instrução e Julgamento" (audiência
+ * única que já conclui com julgamento no mesmo ato) tem regra própria — sempre EFETIVA, exceto
+ * redesignação de mesma categoria (regra geral, prioridade). NÃO segue a árvore normal da
+ * Instrução (não depende de diligência/Encerramento/sinal posterior, porque o julgamento já
+ * ocorreu no próprio ato). Ver docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
  *
  * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) — RESOLVIDO 2026-09-28
  * (Resposta SETIC Dúvida #5, lista completa fornecida pelo documento atualizado):
@@ -508,13 +510,11 @@ classificacao AS (
               OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao_julgamento))
                 THEN 'Adiada'
 
-            -- 1.5) DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): tipo 8
-            --      "Instrução e Julgamento" — julgamento ocorre no mesmo ato, não depende de
-            --      sinal posterior (diferente da Instrução comum, que precisa de um sinal futuro
-            --      para provar que "funcionou"). Sempre Efetiva, exceto redesignação de mesma
-            --      categoria (já tratada na regra 1 acima, com prioridade por vir antes). Ver
-            --      dúvida #4 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md — hipótese implementada,
-            --      não confirmada pela SETIC ainda.
+            -- 1.5) ✅ CONFIRMADO PELA SETIC (2026-09-29, Dúvida #4): tipo 8 "Instrução e
+            --      Julgamento" — julgamento ocorre no mesmo ato, não depende de sinal posterior
+            --      (diferente da Instrução comum, que precisa de um sinal futuro para provar que
+            --      "funcionou"). Sempre Efetiva, exceto redesignação de mesma categoria (já
+            --      tratada na regra 1 acima, com prioridade por vir antes).
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) THEN 'Efetiva'
 
             -- 2) Audiência Inicial: qualquer subsequente conta como efetiva. NOVO (documento

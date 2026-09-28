@@ -166,7 +166,7 @@ dias úteis). Query v2 classifica por omissão (ADIADA) — confirmar se é o es
 
 ---
 
-## 4. Tipo de Audiência 8: "Instrução e Julgamento"
+## 4. Tipo de Audiência 8: "Instrução e Julgamento" — ✅ RESOLVIDA (2026-09-29)
 **Seção do documento:** Escopo geral (linha 6–11)
 
 ### Contexto:
@@ -196,8 +196,12 @@ e) Tipo 8 fica **fora do escopo avaliado** (como Conciliação/Mediação já fi
 ### Pergunta:
 **Confirma a opção (a)?** Se não, qual das outras se aplica?
 
+### ✅ Resposta (2026-09-29):
+**Sim, opção (a) confirmada** — sempre Efetiva, exceto redesignação de mesma categoria.
+
 ### Impacto técnico:
-Query v2 atual trata como tipo desconhecido → cai em ADIADA por omissão. Se (a), adicionar ramo de prioridade máxima "Efetiva" (após checar redesignação de mesma categoria); se (b)/(c), aplicar a árvore correspondente; se (e), remover da população avaliada (`tipo_inicial`/`tipo_una`/`tipo_instrucao`).
+Já implementado em `sql/audiencias_realizadas_v2_draft.sql` (regra 1.5 do `CASE` de
+`classificacao`) — comentários atualizados de "hipótese" para "confirmado pela SETIC".
 
 ---
 
@@ -427,7 +431,7 @@ ao array.
 | 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | ✅ Resolvida (2026-09-28) — implementada | — |
 | 2 | UNA → Julgamento/Conciliação direto fora da janela — **hipótese: Efetiva**, por confirmar (escopo reduzido em 28/09) | 26–55 | Adiada por omissão fora da janela | **Baixo** (residual, maioria já coberta pela janela) |
 | 3 | Instrução sem diligência e sem Julgamento | 57–73 | ⚠️ Parcialmente resolvida (2026-09-28) — resíduo: nenhum sinal registrado | **Baixo** (residual, caso raro) |
-| 4 | Tipo 8 "Instrução e Julgamento" — **hipótese: sempre Efetiva** (exceto redesignação) | — | Hipótese implementada, não confirmada | **Médio** (fora do escopo original) |
+| 4 | Tipo 8 "Instrução e Julgamento" — sempre Efetiva (exceto redesignação) | — | ✅ Resolvida (2026-09-29) — implementada | — |
 | 5 | Sentença terminativa × sentença de mérito | 81–84 | ✅ Resolvida (2026-09-28) — implementada, 27 códigos | — |
 | 6 | Perícia: avaliada quando? | 76 | ✅ Resolvida (2026-09-25) — implementada | — |
 | 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | ✅ Resolvida (2026-09-24) — implementada | — |
@@ -436,7 +440,7 @@ ao array.
 | 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | Herda o padrão atual (`MAX(dt_audiencia)` exato) | **Alto** (perda de dados sem alerta) |
 | 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | Hipótese implementada (só Conciliação em Conhecimento) | **Médio** (afeta 3 regras: Inicial/UNA/Instrução) |
 
-**Pendentes reais (aguardando SETIC):** #4, #8, #10, #11. **Residuais de baixo risco:** #2, #3.
+**Pendentes reais (aguardando SETIC):** #8, #10, #11. **Residuais de baixo risco:** #2, #3.
 
 ---
 

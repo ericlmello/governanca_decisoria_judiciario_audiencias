@@ -87,20 +87,15 @@ Uma perícia conta como "diligência ativa" (sinal de Efetiva) se foi MARCADA (d
 
 ---
 
-## 🔶 Decididas internamente (implementadas; aguardando confirmação formal da SETIC)
-
 ### Dúvida #4: Tipo 8 "Instrução e Julgamento"
 
-**Decisão do usuário (2026-09-24):** "Aplique a regra geral quando não expressa" — tipo 8 tem
-regra própria: **sempre Efetiva** (exceto se redesignado como novo tipo 8, que cai na regra geral
-de mesma categoria = Adiada).
+**Resposta (2026-09-29):** Confirmado — sempre Efetiva, exceto se redesignado como novo tipo 8
+(cai na regra geral de mesma categoria = Adiada).
 
-**Implicação na query v2:** ✅ Já implementado (regra 1.5 do `CASE` de `classificacao`; tipo 8
-adicionado à população avaliada via novo array `tipo_instrucao_julgamento`)
+**Implicação na query v2:** ✅ Já implementado (regra 1.5 do `CASE` de `classificacao`) —
+comentários atualizados de "hipótese" para "confirmado".
 
-**Continua no questionário enviado à SETIC** como pergunta fechada (confirmar/rejeitar a
-hipótese já implementada) — a decisão do usuário destrava a implementação, mas não substitui a
-confirmação formal do negócio sobre uma regra que afeta métrica reportada.
+**Data da resposta:** 2026-09-29
 
 ---
 
@@ -209,7 +204,7 @@ os demais tipos avaliados).
 | 7 | Restrito aos 4 tipos listados (na prática, já mais permissivo) | Encerrada, não aguarda SETIC | `audiencias_realizadas_v2_draft.sql:15` |
 | 9 | RS = Rito Sumário | Encerrada, não aguarda SETIC | `audiencias_realizadas_v2_draft.sql:62,68–71` |
 | 2 | UNA → Julgamento/Conciliação direto fora da janela = Efetiva (regra geral) | Implementada; escopo reduzido em 28/09; **ainda enviada à SETIC** | `audiencias_realizadas_v2_draft.sql`, regra 3d do `CASE` |
-| 4 | Tipo 8 "Instrução e Julgamento" = sempre Efetiva (regra geral) | Implementada; **ainda enviada à SETIC** como pergunta fechada (afeta métrica reportada) | `audiencias_realizadas_v2_draft.sql`, regra 1.5 do `CASE` |
+| 4 | Tipo 8 "Instrução e Julgamento" = sempre Efetiva | ✅ Confirmada pela SETIC (2026-09-29) | `audiencias_realizadas_v2_draft.sql`, regra 1.5 do `CASE` |
 | 11 | Conciliação = só "em Conhecimento" (ids 1,32,20,33) | Implementada; **NOVA pergunta enviada à SETIC** | `audiencias_realizadas_v2_draft.sql`, `parametros.tipo_conciliacao` |
 
 ---
@@ -221,17 +216,17 @@ os demais tipos avaliados).
 - [x] **Dúvida #6 (perícia) respondida e TODO removido** (2026-09-25)
 - [x] **Documento SETIC revisado recebido — Dúvidas #1, #5 resolvidas, #3 parcial** (2026-09-28)
 - [x] Implementar todas as mudanças de regra do documento revisado em `audiencias_realizadas_v2_draft.sql`
-- [ ] Aguardar respostas (dúvidas #2 residual, #3 residual, #4, #8, #10, #11)
+- [x] **Dúvida #4 (tipo 8) confirmada pela SETIC** (2026-09-29)
+- [ ] Aguardar respostas (dúvidas #2 residual, #3 residual, #8, #10, #11)
 - [x] Atualizar este cronograma e `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` conforme respostas chegarem
 - [x] **FASE 3 (Testes):** Criar plano abrangente — `docs/PLANO_TESTES_FASE_3.md` (40+ casos de teste, bloqueadores identificados)
 - [x] **FASE 4 (Monitoramento):** Implementar tabelas `fato_audiencia_classificada`, `trilha_execucao`, `metrica_integridade` — `sql/tabelas_monitoramento_fase4.sql`
-- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#4, #8, #10, #11)
+- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#8, #10, #11)
 - [ ] Testes com dados reais (~100k audiências) — ativado após respostas SETIC
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-28 (Documento SETIC revisado — Dúvidas #1 e #5 resolvidas, #3
-parcial; regras de Conciliação implementadas; nova Dúvida #11 introduzida)
+**Última atualização:** 2026-09-29 (Dúvida #4 confirmada pela SETIC — sempre Efetiva)
 
-**Próxima revisão:** Quando dúvidas restantes (#2 residual, #3 residual, #4, #8, #10, #11) forem respondidas
+**Próxima revisão:** Quando dúvidas restantes (#2 residual, #3 residual, #8, #10, #11) forem respondidas
