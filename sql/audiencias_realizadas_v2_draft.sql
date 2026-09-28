@@ -1,10 +1,31 @@
 /*
- * RASCUNHO — Audiências realizadas (Efetiva/Adiada) segundo os novos critérios
- * do documento "PAI - Critérios Audiências SETIC".
+ * RASCUNHO — Audiências realizadas (Efetiva/Adiada) segundo os critérios do documento
+ * "PAI - Critérios Audiências SETIC" (v2, documento atualizado recebido em 2026-09-28 —
+ * revisão substitui a versão de 2026-09-24 usada na primeira leitura deste rascunho).
  *
  * NÃO EXECUTAR EM PRODUÇÃO ainda: pontos marcados com `-- TODO(confirmar)` ou
  * `-- TODO(decisão)` seguem pendentes. Ver docs/analise_criterios_audiencias_setic.md
  * para o comparativo completo com a query original (sql/audiencias_realizadas_original.sql).
+ *
+ * ATUALIZAÇÃO 2026-09-28 — o documento SETIC foi revisado e resolve 3 das 5 dúvidas que
+ * seguiam pendentes (ver docs/DUVIDAS_SETIC_Criterios_Audiencias.md para o detalhamento):
+ *   - Dúvida #1 (Inicial sem nova audiência) -> RESOLVIDA: novo trigger "ou ocorre a
+ *     prolação da sentença" (regra 2 abaixo, CTE sentenca_ou_acordo_sem_janela).
+ *   - Dúvida #3 (Instrução sem diligência e sem Julgamento) -> PARCIALMENTE RESOLVIDA: nova
+ *     regra explícita "sem diligência + Encerramento de Instrução designado -> Adiada" (regra
+ *     4c abaixo). Resíduo: Instrução sem NENHUM sinal (nem diligência, nem Julgamento/
+ *     Conciliação, nem Encerramento de Instrução) continua sem rótulo explícito no documento —
+ *     cai em Adiada por omissão, caso residual raro.
+ *   - Dúvida #5 (Sentença terminativa conta como "Prolação de sentença"?) -> RESOLVIDA: o
+ *     documento agora lista explicitamente os códigos de movimento para sentença COM e SEM
+ *     resolução de mérito (ver seção de códigos de movimento abaixo).
+ * Também mudou: Conciliação passou a contar como sinal equivalente a Julgamento (UNA/Instrução)
+ * e como tipo de audiência subsequente válido (Inicial); UNA/Instrução que pulam direto para
+ * Encerramento de Instrução (sem diligência) agora seguem a MESMA avaliação da bipartição
+ * (antes caíam automaticamente em Efetiva pela regra "avança de categoria").
+ * Ainda pendentes: Dúvida #4/#10 (watermark autorreferente) e Dúvida #8 (calendário municipal).
+ * NOVA dúvida introduzida por esta atualização: mapeamento exato de "Conciliação" (usamos
+ * Conciliação em Conhecimento — ids 1/32/20/33 — não Conciliação em Execução), a confirmar.
  *
  * Regras implementadas (ver seção 2 do doc de análise):
  *   0. Sinal legado (incompetência declarada/exceção de incompetência acolhida) -> EFETIVA,
@@ -13,22 +34,26 @@
  *   1. Regra geral: redesignação de audiência da MESMA categoria (agrupando variantes
  *      sumaríssimo/videoconferência) -> ADIADA.
  *   2. Inicial: qualquer audiência subsequente (UNA/Instrução/Encerramento de
- *      Instrução/Julgamento) -> EFETIVA.
- *   3. UNA: bipartição (Instrução designada) -> ADIADA por padrão, exceto:
+ *      Instrução/Julgamento/Conciliação) OU prolação de sentença/acordo direto (sem nova
+ *      audiência) -> EFETIVA. [NOVO: Conciliação e sentença/acordo direto, 2026-09-28]
+ *   3. UNA: bipartição (Instrução OU Encerramento de Instrução designado) -> ADIADA por padrão,
+ *      exceto:
  *        a) diligência E Encerramento de Instrução designado (AMBOS, não só a diligência)
  *           em até 3 dias úteis -> EFETIVA
- *        b) sem diligência + Julgamento (ou conclusão/prolação sentença/
- *           homologação de acordo) em até 3 dias úteis -> EFETIVA
+ *        b) sem diligência + Julgamento OU Conciliação (ou conclusão/prolação sentença/
+ *           homologação de acordo) em até 3 dias úteis -> EFETIVA [NOVO: Conciliação, 2026-09-28]
  *   4. Instrução: diligência E Encerramento de Instrução -> EFETIVA;
- *      sem diligência + Julgamento -> EFETIVA.
+ *      sem diligência + Julgamento OU Conciliação -> EFETIVA; [NOVO: Conciliação, 2026-09-28]
+ *      sem diligência + Encerramento de Instrução designado -> ADIADA. [NOVO, 2026-09-28,
+ *      resolve Dúvida #3]
  *   5. Perícia ativa (laudo em aberto, prazo válido) -> conta como diligência. Perícia com
  *      prazo VENCIDO não é tratada aqui (regra pertence ao painel de perícias do PAI —
  *      dependência externa, fora de escopo).
  *   6. Tipo 8 "Instrução e Julgamento": regra própria, sempre EFETIVA (exceto redesignação de
  *      mesma categoria, regra 1) -> DECIDIDO pelo usuário, hipótese não confirmada pela SETIC.
- *   7. UNA seguida de tipo que não é UNA nem Instrução (ex.: Encerramento de Instrução ou
- *      Julgamento direto) -> EFETIVA -> DECIDIDO pelo usuário, hipótese não confirmada pela
- *      SETIC.
+ *   7. UNA seguida de tipo que não é UNA nem Instrução/Encerramento de Instrução (ex.:
+ *      Julgamento ou Conciliação direto) -> EFETIVA -> DECIDIDO pelo usuário, hipótese não
+ *      confirmada pela SETIC.
  *
  * CORREÇÕES feitas numa releitura cuidadosa do documento (bugs de implementação da versão
  * anterior deste rascunho, não dúvidas de negócio — o texto do documento já respondia):
@@ -47,24 +72,23 @@
  *      +15 dias; buffer fixo de 10 dias classificava antes de a janela fechar; comparação com 'S'
  *      em colunas pje."boleano". Todos corrigidos (ver calendario_3du e o WHERE final).
  *
- * CRÍTICO, pendente de decisão: UNA sem nova audiência (terminou com sentença/acordo) e Inicial
- * com acordo homologado caem no ELSE 'Adiada' — a query original as marcava Efetivas. Ver
- * docs/analise_criterios_audiencias_setic.md, seção 7.
+ * RESOLVIDO (2026-09-28, era CRÍTICO pendente de decisão): UNA/Inicial sem nova audiência
+ * (terminou com sentença/acordo) — para Inicial, ver regra 2 acima (sentenca_ou_acordo_sem_janela).
+ * Para UNA "sem nova audiência" especificamente (nenhuma audiência subsequente E sentença/acordo
+ * direto), o documento não trouxe um trigger análogo explícito — permanece via regra geral
+ * (cai em Adiada se nada mais se aplicar). Ver docs/analise_criterios_audiencias_setic.md, seção 7.
  *
  * LACUNAS NO PRÓPRIO DOCUMENTO (não são bug do rascunho — o texto simplesmente não cobre estes
  * casos):
  *   d) [DECIDIDO pelo usuário — "aplique a regra geral quando não expressa"] O que acontece se
- *      uma UNA é seguida de um tipo que NÃO é UNA nem Instrução (ex.: Encerramento de Instrução
- *      ou Julgamento designados diretamente, pulando a Instrução)? O documento só cobre "designa
- *      nova UNA" e "designa Instrução (bipartição)". Implementado: EFETIVA (regra 3d do CASE),
- *      por analogia com a regra da Inicial. Hipótese ainda NÃO confirmada pela SETIC — ver
- *      dúvida #2 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
- *   e) [AINDA PENDENTE — não é caso de "avançar de categoria", não reformulada como (d)] Para
- *      Instrução (seção 2.4), qual o status quando NEM "diligência + Encerramento de Instrução"
- *      NEM "sem diligência + Julgamento" se aplicam (ex.: nada acontece depois)? Ao contrário da
- *      UNA (que tem o rótulo explícito "bipartição injustificada" para esse caso), o documento
- *      não dá um rótulo equivalente para a Instrução. Continua ADIADA por omissão — ver dúvida #3
- *      em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ *      uma UNA é seguida de um tipo que NÃO é UNA nem Instrução/Encerramento de Instrução (ex.:
+ *      Julgamento ou Conciliação designados diretamente)? Implementado: EFETIVA (regra 3d do
+ *      CASE), por analogia com a regra da Inicial. Hipótese ainda NÃO confirmada pela SETIC —
+ *      ver dúvida #2 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ *   e) [PARCIALMENTE RESOLVIDO em 2026-09-28 — ver regra 4c] Resíduo: Instrução sem NENHUM
+ *      sinal (nem diligência, nem Julgamento/Conciliação, nem Encerramento de Instrução
+ *      designado) continua sem rótulo explícito no documento. Continua ADIADA por omissão — ver
+ *      dúvida #3 em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
  *
  * Mapeamento de pje.tb_tipo_audiencia confirmado pelo usuário (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
@@ -73,6 +97,8 @@
  *   Instrução .................... 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo)
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
+ *   Conciliação em Conhecimento .. 1, 32, 20, 33 (usada como SINAL, não faz parte da população
+ *                                  avaliada — ver premissa a confirmar abaixo)
  *   Instrução e Julgamento ....... 8 (regra própria, ver DECIDIDO abaixo — não está no documento)
  *
  * DECIDIDO pelo usuário: ids 7 ("UNA-RS ou Justificação Prévia") e 9 ("Una - RS") entram no
@@ -81,12 +107,17 @@
  * "RS" significar outra coisa, ou se o "ou Justificação Prévia" do id 7 for relevante em algum
  * caso, revisar este mapeamento.
  *
- * DECIDIDO pelo usuário: tipos totalmente fora do documento (Conciliação em Conhecimento
- * (1, 32, 20, 33), Conciliação em Execução (2, 34, 36, 21, 35, 37), Inquirição de testemunha —
- * juízo deprecado (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública
- * (17, 30)) FICAM DE FORA da população avaliada. Já implementado assim (o WHERE de
- * audiencias_realizadas inclui só tipo_inicial/tipo_una/tipo_instrucao/tipo_instrucao_julgamento)
- * — nenhuma mudança necessária.
+ * PREMISSA a confirmar (documento atualizado 2026-09-28 introduziu "Conciliação" como sinal,
+ * sem especificar qual subtipo): usamos apenas Conciliação em Conhecimento (1, 32, 20, 33), NÃO
+ * Conciliação em Execução (2, 34, 36, 21, 35, 37) — esta última é fase pós-julgamento,
+ * temporalmente incompatível com um sinal restrito a poucos dias úteis após a audiência de
+ * conhecimento (Inicial/UNA/Instrução). Ver nova dúvida em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ *
+ * DECIDIDO pelo usuário: tipos totalmente fora da população avaliada (Conciliação em Conhecimento
+ * e em Execução — usados só como SINAL, ver acima —, Inquirição de testemunha — juízo deprecado
+ * (11, 26), Justificação Prévia (18), Mediação (13, 14, 15, 28), Pública (17, 30)) FICAM DE FORA
+ * da população avaliada. Já implementado assim (o WHERE de audiencias_realizadas inclui só
+ * tipo_inicial/tipo_una/tipo_instrucao/tipo_instrucao_julgamento) — nenhuma mudança necessária.
  *
  * DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): tipo 8 "Instrução e
  * Julgamento" (audiência única que já conclui com julgamento no mesmo ato) tem regra própria —
@@ -95,10 +126,15 @@
  * julgamento já ocorreu no próprio ato). Hipótese ainda não confirmada pela SETIC — ver dúvida #4
  * em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
  *
- * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) confirmados pelo usuário:
+ * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento) — RESOLVIDO 2026-09-28
+ * (Resposta SETIC Dúvida #5, lista completa fornecida pelo documento atualizado):
  *   Conclusão para sentença ...... 51 (+ ds_texto_final_externo ILIKE '%sentença%')
- *   Prolação de sentença ......... 219, 220, 221, 50110, 50118 (julgamento de mérito, 1º grau)
- *   Homologação de acordo ........ 466 (Homologada a transação)
+ *   Prolação de sentença COM resolução de mérito (guarda-chuva 385) .. 219, 220, 221, 442, 444,
+ *                                  446, 448, 450, 452, 455, 466, 471, 11795, 50103
+ *   Prolação de sentença SEM resolução de mérito / terminativa (guarda-chuva 218) .. 454, 457,
+ *                                  458, 459, 460, 461, 462, 463, 464, 465, 472, 473
+ *   Homologação de acordo ........ 466 (Homologada a transação — já incluído na lista de mérito
+ *                                  acima, não repetido separadamente)
  *   Expedição ofício/carta precatória/mandado .. NÃO é movimento em tb_processo_evento; vem de
  *                                  tb_processo_expediente.id_tipo_processo_documento, join com
  *                                  tb_tipo_processo_documento.ds_tipo_processo_documento ILIKE
@@ -112,6 +148,10 @@
  *                                  prazo válido (tb_proc_parte_expediente.dt_prazo_legal_parte
  *                                  >= CURRENT_DATE). Mesma tabela tb_processo_expediente da
  *                                  diligência acima, via ds_origem_expediente = 'PERICIA'.
+ *   NOTA: códigos 50110/50118 usados numa versão anterior deste rascunho (hipótese não
+ *   confirmada, "julgado antecipadamente"/"liminarmente improcedente") NÃO aparecem na lista
+ *   oficial do documento atualizado — removidos em favor de 50103 ("Julgado(s) liminarmente
+ *   improcedente(s)"), que é o código que consta no documento.
  *
  * DECIDIDO pelo usuário ("mantém"): os ids 941 (Declarada a incompetência) e 371 (Acolhida a
  * exceção de incompetência) — sinal legado da query ORIGINAL (`OR e.id_evento IN (941, 371)`) —
@@ -120,16 +160,9 @@
  *
  * DECIDIDO pelo usuário: a janela de 3 dias úteis só vale onde o documento a determina
  * explicitamente (UNA/Instrução — regras 3 e 4 acima). A Regra Geral (1) e a regra da Inicial
- * (2) NÃO têm janela — já implementado assim (proxima_audiencia/audiencias_subsequentes não
- * aplicam nenhum limite de data), nenhuma mudança necessária.
- *
- * TODO(decisão SETIC) — "Prolação de sentença" hoje só cobre sentença DE MÉRITO (219/220/221/
- * 50110/50118). tb_evento (categorias) confirma que também existem sentenças TERMINATIVAS
- * (extinção sem resolução do mérito): 456 Extinção e subcausas 458/459/461/463/464/465,
- * 454 Indeferimento da petição inicial, 50126 Julgamento antecipado parcial (SEM resolução do
- * mérito). Uma sentença terminativa também encerra a fase de conhecimento — pendente de
- * confirmação com a SETIC se deve contar como "Prolação de sentença" aqui. Não incluída no
- * rascunho por ora.
+ * (2) NÃO têm janela — já implementado assim (proxima_audiencia/audiencias_subsequentes/
+ * sentenca_ou_acordo_sem_janela não aplicam nenhum limite de data superior), nenhuma mudança
+ * necessária.
  */
 
 WITH parametros AS (
@@ -139,9 +172,16 @@ WITH parametros AS (
         ARRAY[6, 12, 24, 27]       AS tipo_instrucao,
         ARRAY[10, 25]              AS tipo_encerramento_instrucao,
         ARRAY[4]                   AS tipo_julgamento,
-        ARRAY[8]                   AS tipo_instrucao_julgamento -- "Instrução e Julgamento":
+        ARRAY[8]                   AS tipo_instrucao_julgamento, -- "Instrução e Julgamento":
             -- julgamento no mesmo ato; regra própria (ver classificacao), não segue a árvore
             -- normal da Instrução
+        ARRAY[1, 32, 20, 33]       AS tipo_conciliacao -- Conciliação em Conhecimento. NOVO
+            -- (documento atualizado 2026-09-28): "Conciliação" passou a ser sinal explícito de
+            -- Efetiva (Inicial/UNA/Instrução). PREMISSA a confirmar: usamos só "Conciliação em
+            -- Conhecimento" (1, 32, 20, 33), não "Conciliação em Execução" (2, 34, 36, 21, 35, 37)
+            -- — esta última é fase pós-julgamento, temporalmente incompatível com um sinal restrito
+            -- a poucos dias úteis após a audiência de conhecimento. Ver dúvida nova em
+            -- docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
 ),
 
 audiencias_realizadas AS (
@@ -235,6 +275,30 @@ proxima_audiencia AS (
         dt_marcacao
     FROM audiencias_subsequentes
     WHERE ordem = 1
+),
+
+-- NOVO (documento atualizado 2026-09-28): sinal de prolação de sentença/acordo homologado SEM
+-- nova audiência designada — trigger adicional para a regra da Inicial ("... ou ocorre a
+-- prolação da sentença"). Resolve a lacuna crítica documentada no cabeçalho (Inicial com acordo
+-- homologado, sem nova audiência, caindo incorretamente em Adiada) e a Dúvida #1 do questionário
+-- SETIC. SEM janela de 3 dias úteis, igual às demais checagens da Regra 2/1 (decisão do usuário:
+-- só UNA/Instrução têm janela) — por isso não reaproveita movimentos_julgamento (que É
+-- limitada pela janela de calendario_3du), e sim reimplementa a mesma lista de códigos sem o
+-- filtro de data superior.
+sentenca_ou_acordo_sem_janela AS (
+    SELECT DISTINCT r.id_processo_audiencia
+    FROM audiencias_realizadas r
+    INNER JOIN pje.tb_processo_evento tpe ON tpe.id_processo = r.num_proc_id_origem
+    WHERE tpe.dt_atualizacao > r.dta_audiencia
+        AND (
+            (tpe.id_evento = 51 AND tpe.ds_texto_final_externo ILIKE '%sentença%') -- Conclusão p/ sentença
+            OR tpe.id_evento IN (
+                -- Prolação de sentença COM resolução de mérito (Resposta SETIC Dúvida #5)
+                385, 219, 220, 221, 442, 444, 446, 448, 450, 452, 455, 466, 471, 11795, 50103,
+                -- Prolação de sentença SEM resolução de mérito / terminativa (Resposta SETIC Dúvida #5)
+                218, 454, 457, 458, 459, 460, 461, 462, 463, 464, 465, 472, 473
+            )
+        )
 ),
 
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de
@@ -377,23 +441,24 @@ encerramento_instrucao_na_janela AS (
 ),
 
 -- Movimentos de encerramento (conclusão/prolação de sentença, homologação de
--- acordo, marcação de julgamento) em até 3 dias úteis.
+-- acordo, marcação de julgamento ou Conciliação) em até 3 dias úteis.
 -- Achados (amostra de tb_evento_processual/tb_evento):
 --   - Conclusão para sentença: código 51 "Conclusos os autos para #{tipo de conclusão}...",
 --     igual à lógica já usada na query original (texto resolvido contendo "sentença").
---   - Prolação de sentença: não existe como movimento literal; o julgamento de mérito em
---     1º grau aparece como resultado específico — códigos 219 (procedente), 220
---     (improcedente), 221 (procedente em parte), 50110 (julgado antecipadamente parte do
---     mérito), 50118 (liminarmente improcedente).
+--   - Prolação de sentença: RESOLVIDO (Resposta SETIC Dúvida #5, documento atualizado
+--     2026-09-28) — o documento agora lista explicitamente os códigos de movimento tanto para
+--     sentença COM resolução de mérito (guarda-chuva 385: 219/220/221/442/444/446/448/450/452/
+--     455/466/471/11795/50103) quanto SEM resolução de mérito/terminativa (guarda-chuva 218:
+--     454/457/458/459/460/461/462/463/464/465/472/473). Ambas contam como "Prolação de
+--     sentença". Os códigos 50110/50118 usados numa versão anterior deste rascunho (hipótese
+--     não confirmada) NÃO aparecem na lista oficial do documento — removidos.
 --   - Homologação de acordo: não existe como texto literal "homologação de acordo"; o termo
---     técnico trabalhista usado é "transação" — código 466 "Homologada a transação".
---   - Marcação de audiência de julgamento: QUALQUER audiência subsequente desse tipo dentro da
---     janela (via audiencias_subsequentes), mesmo raciocínio do Encerramento de Instrução acima
---     — corrigido; a versão anterior só olhava a audiência imediatamente seguinte.
--- TODO(decisão SETIC): "Prolação de sentença" hoje só cobre sentença DE MÉRITO. Existem
--- também candidatos a sentença TERMINATIVA (extinção sem resolução do mérito), não incluídos
--- até confirmação: 456 (Extinção) e subcausas 458/459/461/463/464/465, 454 (Indeferimento da
--- petição inicial), 50126 (Julgamento antecipado parcial SEM resolução do mérito).
+--     técnico trabalhista usado é "transação" — código 466 "Homologada a transação" (já incluído
+--     na lista de mérito acima, não repetido separadamente).
+--   - Marcação de audiência de julgamento OU Conciliação: QUALQUER audiência subsequente desses
+--     tipos dentro da janela (via audiencias_subsequentes), mesmo raciocínio do Encerramento de
+--     Instrução acima. NOVO (documento atualizado 2026-09-28): Conciliação passou a ser aceita
+--     como sinal equivalente ao Julgamento (antes só Julgamento contava).
 movimentos_julgamento AS (
     SELECT DISTINCT r.id_processo_audiencia
     FROM audiencias_realizadas r
@@ -403,9 +468,12 @@ movimentos_julgamento AS (
         AND cal.limite_3_dias_uteis + INTERVAL '1 day' - INTERVAL '1 second'
         AND (
             (tpe.id_evento = 51 AND tpe.ds_texto_final_externo ILIKE '%sentença%') -- Conclusão p/ sentença
-            OR tpe.id_evento IN (219, 220, 221, 50110, 50118) -- Prolação de sentença (mérito)
-            -- OR tpe.id_evento IN (456, 458, 459, 461, 463, 464, 465, 454, 50126) -- sentença terminativa (TODO decisão SETIC)
-            OR tpe.id_evento = 466 -- Homologada a transação (homologação de acordo)
+            OR tpe.id_evento IN (
+                -- Prolação de sentença COM resolução de mérito (Resposta SETIC Dúvida #5)
+                385, 219, 220, 221, 442, 444, 446, 448, 450, 452, 455, 466, 471, 11795, 50103,
+                -- Prolação de sentença SEM resolução de mérito / terminativa (Resposta SETIC Dúvida #5)
+                218, 454, 457, 458, 459, 460, 461, 462, 463, 464, 465, 472, 473
+            )
         )
 
     UNION
@@ -414,7 +482,7 @@ movimentos_julgamento AS (
     FROM audiencias_subsequentes s
     CROSS JOIN parametros p
     INNER JOIN calendario_3du cal ON cal.id_processo_audiencia = s.id_processo_audiencia
-    WHERE s.id_tipo_audiencia = ANY (p.tipo_julgamento)
+    WHERE s.id_tipo_audiencia = ANY (p.tipo_julgamento || p.tipo_conciliacao) -- Conciliação: NOVO
       AND s.dt_marcacao <= cal.limite_3_dias_uteis
 ),
 
@@ -449,38 +517,51 @@ classificacao AS (
             --      não confirmada pela SETIC ainda.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) THEN 'Efetiva'
 
-            -- 2) Audiência Inicial: qualquer subsequente conta como efetiva
+            -- 2) Audiência Inicial: qualquer subsequente conta como efetiva. NOVO (documento
+            --    atualizado 2026-09-28): "... ou ocorre a prolação da sentença" — Inicial que
+            --    termina direto em sentença/acordo homologado, SEM nova audiência, também é
+            --    Efetiva. Resolve a Dúvida #1 e a lacuna crítica documentada no cabeçalho.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_inicial)
-                 AND pa.id_tipo_audiencia_proxima IS NOT NULL THEN 'Efetiva'
+                 AND (pa.id_tipo_audiencia_proxima IS NOT NULL
+                      OR sa.id_processo_audiencia IS NOT NULL) THEN 'Efetiva'
 
-            -- 3) UNA -> Instrução (bipartição). "Efetiva" por diligência exige TAMBÉM
-            --    Encerramento de Instrução designado (linha do documento: "A designação de
-            --    Encerramento de Instrução é obrigatória quando há diligências pendentes") —
-            --    não basta a diligência sozinha, como uma versão anterior deste rascunho fazia.
+            -- 3) UNA -> Instrução OU Encerramento de Instrução (bipartição). NOVO (documento
+            --    atualizado 2026-09-28): a avaliação de diligência agora se aplica também quando
+            --    a próxima audiência é Encerramento de Instrução DIRETO (pulando a Instrução),
+            --    não só quando é Instrução — o documento esclarece "designa Instrução OU
+            --    encerramento de instrução" no ramo sem sinal (regra 3c abaixo). Antes, pular
+            --    direto para Encerramento de Instrução caía indevidamente na regra 3d (Efetiva
+            --    por "avançar de categoria"); agora exige o mesmo sinal de diligência.
+            --    "Efetiva" por diligência exige TAMBÉM Encerramento de Instrução designado
+            --    (linha do documento: "A designação de Encerramento de Instrução é obrigatória
+            --    quando há diligências pendentes") — não basta a diligência sozinha.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
-                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
+                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao || p.tipo_encerramento_instrucao)
                  AND md.id_processo_audiencia IS NOT NULL
                  AND enc.id_processo_audiencia IS NOT NULL
                 THEN 'Efetiva'
+            -- 3b) sem diligência + Julgamento OU Conciliação designado (ou conclusão/prolação de
+            --     sentença/homologação de acordo) -> Efetiva. NOVO: Conciliação passou a ser
+            --     aceita como sinal equivalente ao Julgamento (já incluída em movimentos_julgamento).
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
-                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
+                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao || p.tipo_encerramento_instrucao)
                  AND md.id_processo_audiencia IS NULL
                  AND mj.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
+            -- 3c) nenhum movimento + designa Instrução OU Encerramento de Instrução -> Adiada
+            --     (bipartição injustificada). Cobre inclusive diligência SEM Encerramento de
+            --     Instrução designado, que cai aqui por eliminação das duas condições acima.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
-                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao)
-                 THEN 'Adiada' -- bipartição injustificada (cobre inclusive diligência SEM
-                                -- Encerramento de Instrução designado, que cai aqui por
-                                -- eliminação das duas condições acima)
+                 AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao || p.tipo_encerramento_instrucao)
+                 THEN 'Adiada'
 
             -- 3d) DECIDIDO pelo usuário ("aplique a regra geral quando não expressa"): UNA
             --     seguida de qualquer OUTRO tipo avaliado que não seja mesma categoria (regra 1,
-            --     já tratada acima) nem Instrução (bipartição, regras 3a-3c acima, exaustivas
-            --     para esse caso) — ex.: Encerramento de Instrução ou Julgamento designados
-            --     diretamente, pulando a Instrução. Por eliminação (as regras anteriores já
-            --     cobrem mesma categoria e Instrução), chegar aqui com uma próxima audiência
-            --     definida significa que ela é de outro tipo avaliado — conta como Efetiva, por
-            --     analogia com a regra da Inicial (avançar de categoria = Efetiva, só repetir a
-            --     mesma categoria é Adiada). Ver dúvida #2 em
+            --     já tratada acima) nem Instrução/Encerramento de Instrução (bipartição, regras
+            --     3a-3c acima, agora exaustivas para os dois casos) — na prática, hoje só
+            --     Julgamento ou Conciliação designados diretamente (mas esses já são capturados
+            --     por mj/regra 3b quando dentro da janela; esta regra remanesce como rede de
+            --     segurança para qualquer outro tipo avaliado fora da janela). Conta como
+            --     Efetiva, por analogia com a regra da Inicial. Ver dúvida #2 em
             --     docs/DUVIDAS_SETIC_Criterios_Audiencias.md — hipótese implementada, não
             --     confirmada pela SETIC ainda.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
@@ -492,15 +573,25 @@ classificacao AS (
                  AND md.id_processo_audiencia IS NOT NULL
                  AND enc.id_processo_audiencia IS NOT NULL
                 THEN 'Efetiva'
+            -- 4b) sem diligência + Julgamento OU Conciliação designado -> Efetiva.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NULL
                  AND mj.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
 
-            -- TODO(decisão SETIC): o documento não define o que acontece com Instrução quando
-            -- nem diligência+Encerramento nem "sem diligência+Julgamento" se aplicam (nada
-            -- acontece depois). Cai aqui por omissão (Adiada) — ver dúvida #3 em
-            -- docs/DUVIDAS_SETIC_Criterios_Audiencias.md (ainda aguardando SETIC; não
-            -- reformulada como as dúvidas #2/#4 porque não é caso de "avançar de categoria").
+            -- 4c) NOVA REGRA EXPLÍCITA (documento atualizado 2026-09-28, resolve Dúvida #3):
+            --     "Sem diligências + encerramento da instrução designado" -> Adiada. Redesignar
+            --     Encerramento de Instrução sem nenhum sinal de diligência é tratado como
+            --     bipartição injustificada, mesma lógica da UNA (regra 3c). Funcionalmente já
+            --     caía no ELSE abaixo por omissão — agora está explícito no documento e no código.
+            WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
+                 AND md.id_processo_audiencia IS NULL
+                 AND enc.id_processo_audiencia IS NOT NULL
+                THEN 'Adiada'
+
+            -- RESÍDUO da Dúvida #3 (não coberto pelo documento mesmo após a atualização de
+            -- 2026-09-28): Instrução sem diligência, sem Julgamento/Conciliação designado E sem
+            -- Encerramento de Instrução designado — ou seja, nenhum sinal registrado. Cai aqui
+            -- por omissão (Adiada). Caso residual raro; ver docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
             ELSE 'Adiada'
         END AS status
     FROM audiencias_realizadas r
@@ -510,6 +601,7 @@ classificacao AS (
     LEFT JOIN movimentos_julgamento mj ON mj.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN encerramento_instrucao_na_janela enc ON enc.id_processo_audiencia = r.id_processo_audiencia
     LEFT JOIN incompetencia_na_janela inc ON inc.id_processo_audiencia = r.id_processo_audiencia
+    LEFT JOIN sentenca_ou_acordo_sem_janela sa ON sa.id_processo_audiencia = r.id_processo_audiencia
 )
 SELECT
     c.nr_processo, c.id_processo,

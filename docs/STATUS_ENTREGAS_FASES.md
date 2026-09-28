@@ -1,7 +1,18 @@
 # Status de Entregas por Fase
 
-**Data de compilação:** 2026-09-25 (Atualizado 2026-09-25)  
-**Status geral:** Fase 2 ~75% completa (5 dúvidas); Fase 3 planejada; Fases 4–5 completas aguardando Fase 3
+**Data de compilação:** 2026-09-25 (Atualizado 2026-09-28)  
+**Status geral:** Fase 2 ~90% completa (documento SETIC revisado resolveu #1, #5, #3 parcial); Fase 3 planejada; Fases 4–5 completas aguardando Fase 3
+
+---
+
+## ATUALIZAÇÃO 2026-09-28 — Documento SETIC Revisado
+
+A SETIC enviou uma versão revisada do documento "PAI - Critérios Audiências SETIC", resolvendo
+as Dúvidas #1 (Inicial sem nova audiência) e #5 (sentença terminativa) totalmente, e #3
+(Instrução sem diligência/Julgamento) parcialmente. Também introduziu Conciliação como sinal
+válido (Inicial/UNA/Instrução) e uma nova dúvida (#11, mapeamento do tipo Conciliação). Todas as
+mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
+`docs/DUVIDAS_SETIC_Criterios_Audiencias.md` para o detalhamento completo.
 
 ---
 
@@ -10,8 +21,8 @@
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
 | 1 | Análise de regras | ✅ Completo | — | ✅ Concluído |
-| 2 | Query v2 + bugs | ⚠️ 75% completo | SETIC #1, #3, #5 | Aguardar respostas |
-| 3 | Testes ~100k | 📋 Pronto (40+ casos) | Fase 2 + respostas | Executar quando Fase 2 pronta |
+| 2 | Query v2 + bugs | ⚠️ ~90% completo | SETIC #4, #11 (residuais #2/#3 baixo risco) | Aguardar respostas restantes |
+| 3 | Testes ~100k | 📋 Pronto (40+ casos) | Acesso a banco de dados real | Pode iniciar já (regras críticas resolvidas) |
 | 4 | Monitoramento | ✅ 4a–4c completo | SETIC #10 (só 4d) | ✅ Pronto; 4d após resposta |
 | 5 | Produção | ✅ Guia pronto | Fase 3 OK + Fase 4 | Pronto; deploy após Fase 3 ✅ |
 
@@ -27,10 +38,10 @@
   - Documentação de decisões internas (tipos RS, tipo 8, incompetência)
   - 10 dúvidas identificadas para SETIC
 
-- ✅ `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (17KB)
-  - 10 dúvidas estruturadas (fechadas + abertas)
+- ✅ `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (11 dúvidas após revisão de 2026-09-28)
+  - Dúvidas estruturadas (fechadas + abertas)
   - Impacto classificado (Alto/Médio/Baixo)
-  - Enviado ao SETIC em 2026-09-24
+  - Enviado ao SETIC em 2026-09-24; atualizado com resoluções em 2026-09-28
 
 - ✅ `docs/RESPOSTAS_SETIC_Cronograma.md`
   - Rastreamento de respostas
@@ -39,30 +50,35 @@
 
 ---
 
-## Fase 2: Prototipagem e Implementação ⚠️ (~75% completo)
+## Fase 2: Prototipagem e Implementação ⚠️ (~90% completo)
 
 ### Entregáveis
-- ✅ `sql/audiencias_realizadas_v2_draft.sql` (800+ linhas)
+- ✅ `sql/audiencias_realizadas_v2_draft.sql` (~630 linhas)
   - Implementação das 7 regras formalizadas
   - 6 bugs corrigidos (comparação de categoria, Encerramento obrigatório, Julgamento tardio, calendário, busca limitada, buffer de 10 dias, tipo de dado)
-  - Regras para dúvidas #2 e #4 implementadas como hipóteses (decisão do usuário)
-  - ✅ TODO de Dúvida #2 removido (2026-09-25, Perícia Ativa respondida)
-  - TODOs marcados para dúvidas #1, #3, #5, #8, #10
+  - ✅ Dúvidas #1, #5 resolvidas e implementadas (2026-09-28, documento SETIC revisado)
+  - ✅ Dúvida #3 parcialmente resolvida e implementada (2026-09-28)
+  - ✅ Dúvida #6 (perícia) resolvida e implementada (2026-09-25)
+  - Regras para dúvidas #2 e #4 implementadas como hipóteses (decisão do usuário, escopo de #2 reduzido em 28/09)
+  - TODOs/premissas remanescentes: dúvidas #2 (residual), #3 (residual), #4, #8, #10, #11
 
 ### Bloqueadores Críticos
 | Dúvida | Tópico | Status | Impacto | Prioridade |
 |--------|--------|--------|---------|-----------|
-| #1 | Inicial sem nova audiência (acordo/sentença) | Aberta | **Alto** (regressão vs v1) | BLOQUEADOR |
-| #2 | Perícia ativa avaliada quando? | ✅ Respondida (2026-09-25) | Médio | ✅ IMPLEMENTADA |
-| #3 | Instrução sem diligência e sem Julgamento | Aberta | Médio | BLOQUEADOR |
-| #5 | Sentença terminativa = "prolação"? | Aberta | Médio | BLOQUEADOR |
+| #1 | Inicial sem nova audiência (acordo/sentença) | ✅ Resolvida (2026-09-28) | — | ✅ IMPLEMENTADA |
+| #2 | UNA → Julgamento/Conciliação direto fora da janela | Aberta (escopo reduzido) | Baixo (residual) | Hipótese implementada |
+| #3 | Instrução sem nenhum sinal (residual) | Parcial (2026-09-28) | Baixo (residual) | Hipótese implementada |
+| #4 | Tipo 8 "Instrução e Julgamento" | Aberta | Médio | Hipótese implementada |
+| #5 | Sentença terminativa = "prolação"? | ✅ Resolvida (2026-09-28) | — | ✅ IMPLEMENTADA |
+| #6 | Perícia ativa avaliada quando? | ✅ Resolvida (2026-09-25) | — | ✅ IMPLEMENTADA |
 | #8 | Calendário: abrangência municipal? | Aberta | Baixo | Opcional (SP only) |
 | #10 | Watermark autorreferente | Aberta | **Alto** (arquitetura) | NÃO bloqueia Fases 3–4a |
+| #11 | Mapeamento exato de "Conciliação" | Aberta (NOVA 2026-09-28) | Médio | Hipótese implementada |
 
 ### O que falta para finalizar Fase 2
-- [ ] Resposta SETIC a dúvidas #1, #3, #5 (críticas)
-- [ ] Implementar lógica conforme respostas
-- [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvida #2, 2026-09-25)
+- [ ] Resposta SETIC às dúvidas restantes (#4, #8, #10, #11 — prioritárias; #2/#3 residuais de baixo risco)
+- [ ] Implementar lógica conforme respostas (se diferente das hipóteses já assumidas)
+- [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvidas #1, #5, #6, 3-parcial)
 
 ---
 
@@ -78,16 +94,19 @@
   - Critérios de sucesso definidos
 
 ### Bloqueadores
-- ⏳ Resposta SETIC a dúvidas #1, #3, #5 (para finalizar query)
-- ⏳ Acesso a banco de dados (~100k audiências reais)
+- ⏳ Acesso a banco de dados (~100k audiências reais) — **único bloqueador real restante**
+- Dúvidas #4, #8, #10, #11 não bloqueiam o início dos testes (hipóteses já implementadas,
+  testes podem rodar e ser reexecutados se a resposta SETIC mudar a lógica)
 
-### O que fazer quando respostas chegarem
-1. Atualizar query v2 com lógica respondida (dúvidas #1, #3, #5)
+### O que fazer agora (já pode iniciar)
+1. Obter acesso a ambiente DEV/QA com dados reais
 2. Executar testes (seção 5 do PLANO_TESTES_FASE_3.md)
 3. Gerar relatório de delta vs. v1
 4. Documentar regressões (se houver)
+5. Se resposta SETIC às dúvidas #4/#8/#10/#11 chegar depois, reexecutar testes específicos daquela regra
 
-**Nota:** Dúvida #2 já foi respondida (2026-09-25) e implementada
+**Nota:** Dúvidas #1, #3 (parcial), #5, #6 já foram respondidas e implementadas (ver
+`docs/DUVIDAS_SETIC_Criterios_Audiencias.md`) — Fase 3 não está mais bloqueada pela Fase 2.
 
 ---
 
@@ -148,7 +167,8 @@
 ## Fase 5: Produção ✅ (Pronto para Deploy)
 
 ### Requisitos
-- ⏳ Fase 2 finalizada (query v2 com dúvidas #1, #3, #5 respondidas)
+- ✅ Fase 2 substancialmente finalizada (dúvidas críticas #1, #5 resolvidas; #3 parcial; residuais
+  #4/#8/#10/#11 não bloqueiam produção com as hipóteses já implementadas)
 - ⏳ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
 - ✅ Fase 4a–4c operacional (monitoramento em funcionamento)
 
@@ -175,14 +195,17 @@
 
 ### O que SETIC precisa fazer (Bloqueadores)
 Responder formalmente a dúvidas:
-- [ ] #1: Inicial sem nova audiência → Efetiva ou Adiada?
-- [x] #2: Perícia ativa avaliada quando? **→ Opção (c) Marcada na janela (2026-09-25)**
-- [ ] #3: Instrução sem diligência e sem Julgamento → Adiada ou outra regra?
-- [ ] #5: Sentença terminativa conta como "prolação de sentença"?
+- [x] #1: Inicial sem nova audiência → **Efetiva (via "prolação da sentença"), respondido 2026-09-28**
+- [x] #6: Perícia ativa avaliada quando? **→ Opção (c) Marcada na janela (2026-09-25)**
+- [x] #5: Sentença terminativa conta como "prolação de sentença"? **→ SIM, respondido 2026-09-28**
+- [ ] #3 (residual): Instrução sem NENHUM sinal (nem diligência, nem Julgamento/Encerramento) → Adiada por omissão, confirmar?
+- [ ] #2 (residual): UNA → Julgamento/Conciliação direto fora da janela → Efetiva, confirmar?
+- [ ] #4: Tipo 8 "Instrução e Julgamento" → sempre Efetiva, confirmar?
 - [ ] #8: Calendário suspensão municipal (granular, estadual ou nacional)?
 - [ ] #10: Watermark autorreferente é intencional? Existe reprocessamento?
+- [ ] #11 (NOVA): Conciliação em Conhecimento apenas, ou também Execução?
 
-**Prazo sugerido:** Máx. 2 semanas (2026-10-09)
+**Prazo sugerido:** Máx. 2 semanas a partir de 2026-09-28 (2026-10-12) para as restantes
 
 ### O que pode acontecer em PARALELO (não aguarda SETIC)
 - [x] Fase 3: Plano de testes estruturado (pronto para executar quando respostas chegarem)
@@ -198,17 +221,17 @@ Responder formalmente a dúvidas:
 ## Cronograma Recomendado
 
 ```
-2026-09-25    ← Data de compilação deste documento
+2026-09-28    ← Documento SETIC revisado recebido; dúvidas críticas #1/#5 resolvidas
  ↓
-2026-09-30    Resposta SETIC esperada (dúvidas críticas)
+2026-09-29    Fase 3 pode iniciar já (bloqueador de regras removido)
  ↓
-2026-10-05    Finalizar Fase 2 (implementação das respostas)
+2026-10-10    Fase 3 executada (testes com ~100k)
  ↓
-2026-10-12    Fase 3 executada (testes com ~100k)
+2026-10-12    Resposta SETIC esperada (dúvidas restantes #4/#8/#10/#11)
  ↓
-2026-10-19    Fase 4a–4c operacional + Fase 3 aprovada
+2026-10-17    Fase 4a–4c operacional + Fase 3 aprovada
  ↓
-2026-10-26    Deploy em produção (com contingência/rollback)
+2026-10-24    Deploy em produção (com contingência/rollback)
 ```
 
 ---
@@ -227,7 +250,7 @@ Responder formalmente a dúvidas:
 - `docs/analisa_criterios_audiencias_setic.md` — Análise completa com bugs encontrados
 
 **Documentação de Dúvidas:**
-- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 10 dúvidas estruturadas
+- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 11 dúvidas estruturadas (7 resolvidas total/parcial)
 
 **Implementação:**
 - `sql/audiencias_realizadas_v2_draft.sql` — Query v2 (Fase 2)
@@ -240,5 +263,5 @@ Responder formalmente a dúvidas:
 
 ---
 
-**Última atualização:** 2026-09-25  
-**Próxima revisão:** Quando respostas SETIC chegarem (esperado 2026-09-30)
+**Última atualização:** 2026-09-28 (documento SETIC revisado — dúvidas #1/#5 resolvidas, #3 parcial)  
+**Próxima revisão:** Quando respostas às dúvidas restantes chegarem (#4, #8, #10, #11 — esperado 2026-10-12)

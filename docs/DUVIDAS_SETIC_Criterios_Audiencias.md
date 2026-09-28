@@ -2,14 +2,40 @@
 
 **De:** TRT-2 / Engenharia de Dados  
 **Para:** SETIC / Núcleo de Governança de Audiências  
-**Data:** 2026-09-24  
+**Data:** 2026-09-24 (última atualização: 2026-09-28)  
 **Referência:** Documento "PAI - Critérios Audiências SETIC" (Definição de audiências Efetivas, Adiadas e impactos no IAD)
+
+---
+
+## ATUALIZAÇÃO 2026-09-28 — Revisão do Documento SETIC
+
+A SETIC enviou uma versão revisada do documento "PAI - Critérios Audiências SETIC" em 2026-09-28,
+que **resolve 3 das dúvidas abaixo** (#1, #3 parcial, #5) e **introduz mudanças de regra** que já
+foram implementadas em `sql/audiencias_realizadas_v2_draft.sql`:
+
+- **Conciliação** passou a contar como sinal equivalente a Julgamento (UNA/Instrução) e como tipo
+  de audiência subsequente válido (Inicial).
+- **Inicial**: novo trigger "ou ocorre a prolação da sentença" — Inicial que termina direto em
+  sentença/acordo, sem nova audiência, agora é Efetiva. **Resolve a Dúvida #1.**
+- **UNA**: audiências que pulam direto para Encerramento de Instrução (sem diligência) agora
+  seguem a MESMA avaliação da bipartição (antes caíam automaticamente em Efetiva pela regra de
+  "avançar de categoria" — ver Dúvida #2, escopo agora reduzido).
+- **Instrução**: nova regra explícita "sem diligência + Encerramento de Instrução designado →
+  Adiada". **Resolve parcialmente a Dúvida #3** (resíduo: Instrução sem nenhum sinal registrado
+  continua sem rótulo explícito).
+- **Prolação de sentença**: o documento agora lista explicitamente os códigos de movimento para
+  sentença COM e SEM resolução de mérito. **Resolve a Dúvida #5.**
+
+Essa atualização também introduziu uma nova pergunta em aberto — ver **Dúvida #11** (mapeamento
+exato do tipo de audiência "Conciliação").
 
 ---
 
 ## Resumo Executivo
 
-Durante a implementação do algoritmo de classificação de audiências (Efetivas × Adiadas) em SQL/PostgreSQL, identificamos **9 pontos que carecem de clarificação** no documento original. Alguns são lacunas explícitas (casos não cobertos pelo texto), outros derivam da necessidade de traduzir as regras para lógica de banco de dados (ambiguidades de sequência, temporalidade ou escopo).
+Durante a implementação do algoritmo de classificação de audiências (Efetivas × Adiadas) em SQL/PostgreSQL, identificamos **11 pontos que carecem ou careceram de clarificação** no documento original (9 originais + 1 nova em 28/09). Alguns são lacunas explícitas (casos não cobertos pelo texto), outros derivam da necessidade de traduzir as regras para lógica de banco de dados (ambiguidades de sequência, temporalidade ou escopo).
+
+**Status consolidado (2026-09-28):** 7 resolvidas (#1, #5, #6, #7, #9 totalmente; #2 parcialmente reduzida em escopo; #3 parcialmente), 4 pendentes (#2 residual, #4, #8, #10, #11).
 
 **Estrutura deste documento:**
 - Cada dúvida está ancorada à seção do documento original onde se origina
@@ -18,7 +44,7 @@ Durante a implementação do algoritmo de classificação de audiências (Efetiv
 
 ---
 
-## 1. Audiência Inicial com Encaminhamento para Acordo / Conclusão Direta
+## 1. Audiência Inicial com Encaminhamento para Acordo / Conclusão Direta — ✅ RESOLVIDA (2026-09-28)
 **Seção do documento:** 📋 Audiência Inicial (linha 14–22)
 
 ### Regra atual:
@@ -35,14 +61,22 @@ Uma audiência **Inicial** que **não é redesignada** (regra geral não se apli
 ### Pergunta:
 Esses desfechos (Inicial → Acordo/Conclusão, sem nova audiência) contam como **Efetiva**?
 
+### ✅ Resposta (documento revisado, 2026-09-28):
+O documento atualizado acrescentou explicitamente **"ou ocorre a prolação da sentença"** como
+trigger alternativo da regra da Inicial, ao lado da lista de audiências subsequentes. Confirma-se
+que Inicial → sentença/acordo homologado **diretamente**, sem nova audiência, é **EFETIVA**.
+
 ### Impacto técnico:
-- Query atual (original): Classifica como **Efetiva** (por ausência de sinal de "Adiada")
-- Query v2 (literária): Classifica como **Adiada** (nenhuma subsequente é encontrada → cai em `ELSE`)
-- **Esperado:** Confirmar qual é o correto
+- Query atual (original): Classificava como **Efetiva** (por ausência de sinal de "Adiada")
+- Query v2 (antes desta atualização): Classificava como **Adiada** (nenhuma subsequente é encontrada → caía em `ELSE`)
+- **Implementado:** nova CTE `sentenca_ou_acordo_sem_janela` (sem janela de 3 dias úteis, igual às
+  demais checagens da Inicial) + novo ramo na regra 2 do `CASE` de `classificacao`, em
+  `sql/audiencias_realizadas_v2_draft.sql`. Usa a mesma lista de códigos de movimento resolvida
+  na Dúvida #5 (sentença com E sem resolução de mérito).
 
 ---
 
-## 2. UNA Seguida de Tipo Fora do Documento
+## 2. UNA Seguida de Tipo Fora do Documento — ⚠️ ESCOPO REDUZIDO (2026-09-28)
 **Seção do documento:** 🔵 Audiência UNA (linha 26–55)
 
 ### Regra atual:
@@ -56,20 +90,41 @@ Uma UNA é seguida de um tipo de audiência **que não está em nenhum dos dois 
 - Julgamento (id_tipo_audiencia = 4)
 - Conciliação / Mediação / outro
 
-### Hipótese de trabalho (para confirmar, não assumida na query):
-Por analogia com a Audiência Inicial (que tem regra explícita: qualquer subsequente entre 4 tipos listados = Efetiva) e com o espírito geral do documento (repetir a mesma categoria = Adiada; **avançar** de categoria = Efetiva), UNA seguida de Encerramento de Instrução ou Julgamento **diretamente** (pulando a Instrução) poderia ser **Efetiva** — o processo avançou de estágio, não regrediu nem repetiu.
+### ⚠️ Atualização (documento revisado, 2026-09-28) — Encerramento de Instrução SAI desta dúvida:
+O documento revisado esclareceu que "nenhum movimento + designa Instrução **ou encerramento de
+instrução**" → ADIADA. Ou seja, **UNA → Encerramento de Instrução direto (sem diligência) NÃO é
+mais parte desta dúvida** — passa a seguir a MESMA avaliação de 3 dias úteis da bipartição
+UNA→Instrução (diligência+Encerramento exigidos para Efetiva). Já implementado em
+`sql/audiencias_realizadas_v2_draft.sql` (regras 3a–3c do `CASE`, condição ampliada para
+`tipo_instrucao || tipo_encerramento_instrucao`).
 
-**Contraponto que nos impede de assumir isso sozinhos:** o documento trata a bipartição UNA→Instrução com regras **propositalmente rígidas** (Adiada por padrão, só Efetiva com diligência+Encerramento ou sem diligência+Julgamento em até 3 dias) — justamente porque é considerado suspeito (a UNA "deveria" ter colhido a prova oral). Se UNA→Encerramento/Julgamento direto virasse automaticamente Efetiva sem nenhum escrutínio, isso seria **mais permissivo** que o próprio caminho da bipartição, o que pode não ser a intenção.
+**O que resta em aberto:** UNA seguida de **Julgamento ou Conciliação diretamente** (pulando a
+Instrução) — esse caso não tem regra explícita no documento. Continua como hipótese não
+confirmada (ver abaixo), mas o escopo do risco caiu bastante: Julgamento/Conciliação designados
+dentro da janela de 3 dias úteis já são capturados pela regra 3b (Efetiva, mesmo tratamento do
+"sem diligência + Julgamento" da bipartição) — a regra 3d (hipótese abaixo) só se aplica como
+rede de segurança para esses tipos FORA da janela de 3 dias úteis.
+
+### Hipótese de trabalho (para confirmar, não assumida na query):
+Por analogia com a Audiência Inicial (que tem regra explícita: qualquer subsequente entre os
+tipos listados = Efetiva) e com o espírito geral do documento (repetir a mesma categoria =
+Adiada; **avançar** de categoria = Efetiva), UNA seguida de Julgamento ou Conciliação
+**diretamente**, fora da janela de 3 dias úteis, poderia ser **Efetiva** — o processo avançou de
+estágio, não regrediu nem repetiu.
 
 ### Pergunta:
-**Confirma a hipótese acima (UNA → Encerramento/Julgamento direto = Efetiva, por analogia com a Inicial)?** Ou esse salto de etapa deveria receber o mesmo escrutínio de 3 dias úteis da bipartição (e nesse caso, com quais movimentos)?
+**Confirma a hipótese acima (UNA → Julgamento/Conciliação direto, fora da janela = Efetiva, por
+analogia com a Inicial)?** Ou esse caso deveria ser tratado como Adiada por falta de regra
+explícita?
 
 ### Impacto técnico:
-Falta ramo decisório (cai no `ELSE` genérico, hoje Adiada). Se a hipótese for confirmada, adicionar ramo "Efetiva" para esses dois desfechos; se precisar de escrutínio, replicar a lógica de 3 dias úteis da bipartição.
+Ramo "3d" do `CASE` (Efetiva por eliminação) — hoje é rede de segurança residual, de baixo
+impacto esperado (a maioria dos casos reais de Julgamento/Conciliação após UNA cai dentro da
+janela de 3 dias úteis e já é tratada pela regra 3b).
 
 ---
 
-## 3. Instrução Sem Diligência e Sem Julgamento
+## 3. Instrução Sem Diligência e Sem Julgamento — ⚠️ PARCIALMENTE RESOLVIDA (2026-09-28)
 **Seção do documento:** 📑 Audiência de Instrução (linha 57–73)
 
 ### Regra atual:
@@ -88,8 +143,26 @@ Qual é o status? O documento cita a UNA com um rótulo para esse caso ("biparti
 ### Pergunta:
 Por analogia com a UNA, seria **Adiada**? Ou existe outra regra?
 
+### ⚠️ Resposta parcial (documento revisado, 2026-09-28):
+O documento acrescentou uma nova linha explícita: **"Sem diligências + encerramento da instrução
+designado" → ADIADA**. Isso confirma, para o sub-caso específico de "Encerramento de Instrução
+redesignado sem sinal de diligência", que o resultado é Adiada (mesma lógica de "bipartição
+injustificada" da UNA). Já implementado (`sql/audiencias_realizadas_v2_draft.sql`, regra 4c).
+
+**Resíduo ainda em aberto:** o documento não cobriu o caso de Instrução **sem NENHUM sinal
+registrado** — nem diligência, nem Julgamento/Conciliação designado, nem Encerramento de
+Instrução designado (isto é, nada acontece depois, nenhuma audiência nova é sequer marcada).
+Esse caso residual continua caindo em ADIADA por omissão (`ELSE` do `CASE`), sem confirmação
+explícita da SETIC.
+
+### Pergunta remanescente:
+Instrução sem qualquer sinal subsequente (nem diligência, nem Julgamento/Conciliação/Encerramento
+de Instrução designado) — confirma **Adiada** por omissão, ou existe alguma regra de prazo/tempo
+adicional (ex.: aguardar X dias além dos 3 úteis antes de classificar)?
+
 ### Impacto técnico:
-Lacuna análoga à dúvida #2. Query v2 classifica por omissão (ADIADA) — confirmar se é o esperado.
+Caso residual raro na prática (a maioria das Instruções tem algum movimento subsequente em até 3
+dias úteis). Query v2 classifica por omissão (ADIADA) — confirmar se é o esperado.
 
 ---
 
@@ -128,14 +201,14 @@ Query v2 atual trata como tipo desconhecido → cai em ADIADA por omissão. Se (
 
 ---
 
-## 5. Sentença Terminativa ("Extinção") × Sentença de Mérito
+## 5. Sentença Terminativa ("Extinção") × Sentença de Mérito — ✅ RESOLVIDA (2026-09-28)
 **Seção do documento:** 🔵 Audiência UNA, Movimentos Monitorados (linha 81–84)
 
 ### Regra atual:
 > "...Prolação de sentença" (código de movimento esperado)
 
 ### Contexto:
-Os movimentos de "Prolação de sentença" mapeados são:
+Os movimentos de "Prolação de sentença" mapeados (hipótese anterior) eram:
 - **Mérito:** id 219 (Procedência), 220 (Improcedência), 221 (Procedência em Parte), 50110 e 50118
 - **Terminativa:** id 456 (Extinção), 458–465 (causas de extinção), 454 (Indeferimento), 50126 (Julgamento Antecipado Parcial)
 
@@ -144,12 +217,27 @@ A **sentença terminativa** (extinção sem resolução do mérito) também **en
 ### Pergunta:
 A "Prolação de sentença" deve incluir sentença terminativa (extinção)? Ou apenas sentença de mérito?
 
+### ✅ Resposta (documento revisado, 2026-09-28):
+**SIM — ambas contam.** O documento atualizado trouxe a lista COMPLETA e oficial de códigos de
+movimento, substituindo a hipótese anterior:
+
+- **Com resolução do mérito** (guarda-chuva 385): 219 (procedente), 220 (improcedente), 221
+  (procedente em parte), 442, 444, 446, 448, 450, 452, 455, 466 (homologada transação/acordo),
+  471, 11795, 50103
+- **Sem resolução do mérito / terminativa** (guarda-chuva 218): 454 (indeferida petição inicial),
+  457, 458, 459, 460, 461, 462, 463, 464, 465, 472, 473 (diversas causas de extinção)
+
+Os códigos 50110/50118 usados na hipótese anterior **não aparecem** na lista oficial — foram
+removidos; o código correto para "liminarmente improcedente" é **50103**.
+
 ### Impacto técnico:
-Query v2 hoje ativa apenas as de mérito (219/220/221/50110/50118). Se terminativas devem contar, descomentar ids 456/458–465/454/50126.
+Implementado em `sql/audiencias_realizadas_v2_draft.sql` (CTEs `movimentos_julgamento` e
+`sentenca_ou_acordo_sem_janela`) — lista completa de 27 códigos substituindo a lista parcial
+anterior (5 códigos, só mérito).
 
 ---
 
-## 6. Perícia Ativa: Avaliação em Qual Momento?
+## 6. Perícia Ativa: Avaliação em Qual Momento? — ✅ RESOLVIDA (2026-09-25)
 **Seção do documento:** 📋 Movimentos Monitorados, linha 76 e 📑 Audiência de Instrução, linha 62
 
 ### Regra atual:
@@ -169,12 +257,17 @@ A condição "perícia ativa" deveria ser:
 - **(b) Estado no final da janela de 3 dias úteis** — determinístico, viável em reprocessamento
 - **(c) Perícia marcada dentro da janela, independente de status atual** — apenas verifica se foi iniciada
 
+### ✅ Resposta (2026-09-25):
+**Opção (c)** — perícia conta como diligência se foi **marcada** (`dt_marcacao`) dentro da janela
+de 3 dias úteis, independente de status atual ou de quando o laudo for finalizado.
+
 ### Impacto técnico:
-Define a semântica de reprocessamento. Com (a), reprocessar mais tarde pode mudar histórico; com (b)/(c), o resultado fica invariante.
+Já estava correto em `sql/audiencias_realizadas_v2_draft.sql` (CTE `movimentos_diligencia`,
+condição `pp.dt_marcacao BETWEEN ...`) — TODO(confirmar) removido do código.
 
 ---
 
-## 7. "Qualquer Audiência Subsequente" da Inicial: Qual Escopo?
+## 7. "Qualquer Audiência Subsequente" da Inicial: Qual Escopo? — ✅ RESOLVIDA (2026-09-24)
 **Seção do documento:** 📋 Audiência Inicial (linha 14–21)
 
 ### Regra atual:
@@ -197,8 +290,16 @@ Confirmar se "qualquer" é:
 - **(a) Restrita aos 4 tipos listados** (UNA, Instrução, Encerramento, Julgamento)
 - **(b) Verdadeiramente qualquer tipo** (literal)
 
+### ✅ Resposta (2026-09-24):
+**Opção (a)** — restrita aos 4 tipos listados (UNA, Instrução, Encerramento de Instrução,
+Julgamento). **Atualização (2026-09-28):** o documento revisado adicionou explicitamente
+**Conciliação** como 5º tipo aceito na lista da Inicial, e **implementação atual já cobre
+qualquer subsequente sem filtro de tipo** (ver `proxima_audiencia`, que não restringe por tipo) —
+na prática a Inicial já era mais permissiva que a resposta (a) sugeria, e a inclusão de
+Conciliação no documento confirma que essa permissividade está alinhada à intenção da SETIC.
+
 ### Impacto técnico:
-Query v2 implementa (a). Se for (b), remover o filtro por tipo.
+Query v2 já implementa corretamente (nenhuma mudança necessária).
 
 ---
 
@@ -229,7 +330,7 @@ Query v2 atual ignora `id_municipio` (opção c). Se a resposta for (a), precisa
 
 ---
 
-## 9. [Informativo] Tipos 7 e 9: "RS" = "Rito Sumário"?
+## 9. [Informativo] Tipos 7 e 9: "RS" = "Rito Sumário"? — ✅ RESOLVIDA (2026-09-24)
 **Seção do documento:** Escopo geral e tipo UNA
 
 ### Contexto:
@@ -245,8 +346,12 @@ A query original não diferencia ritos (ordinário/sumário/sumaríssimo) — el
 ### Pergunta:
 Confirmar: "RS" = "Rito Sumário" (correto) ou significa outra coisa? Se incorreto, qual seria a classificação correta desses dois tipos?
 
+### ✅ Resposta (2026-09-24):
+Confirmado — "RS" = "Rito Sumário" (terceiro rito trabalhista, CLT/Lei 5.584/70). Ids 7 e 9
+permanecem mapeados como UNA.
+
 ### Impacto técnico:
-É uma classificação de negócio (sem impacto imediato na lógica SQL). Se for incorreto, ajustar o mapeamento de `tipo_una` na query.
+Classificação de negócio confirmada, mapeamento de `tipo_una` já estava correto — nenhuma mudança necessária.
 
 ---
 
@@ -283,20 +388,55 @@ Recomendação já adotada na v2 (aguardando confirmação do padrão de carga):
 
 ---
 
+## 11. [NOVA — 2026-09-28] Mapeamento Exato do Tipo "Conciliação"
+**Seção do documento:** 📋 Audiência Inicial, 🔵 Audiência UNA, 📑 Audiência de Instrução (documento revisado 2026-09-28)
+
+### Contexto:
+A revisão do documento de 2026-09-28 introduziu "Conciliação" como sinal válido em três pontos:
+como audiência subsequente aceita para a Inicial, como sinal equivalente a Julgamento na UNA/
+Instrução ("sem diligência + Julgamento designado **ou Conciliação**"), e como uma das
+"marcações de audiência" monitoradas ("Marcação de audiência de julgamento / encerramento de
+instrução / conciliação").
+
+O documento não especifica QUAL subtipo de Conciliação é relevante. O catálogo de
+`tb_tipo_audiencia` tem dois grupos distintos:
+- **Conciliação em Conhecimento** (ids 1, 32, 20, 33) — fase de conhecimento, mesma fase de
+  Inicial/UNA/Instrução
+- **Conciliação em Execução** (ids 2, 34, 36, 21, 35, 37) — fase de execução, pós-julgamento
+
+### Hipótese de trabalho (implementada, não confirmada):
+Usamos apenas **Conciliação em Conhecimento** (1, 32, 20, 33). Conciliação em Execução ocorre
+temporalmente muito depois (fase de execução, após trânsito em julgado), incompatível com sinais
+restritos a poucos dias úteis após uma audiência de conhecimento.
+
+### Pergunta:
+Confirma que "Conciliação", nos três contextos acima, se refere apenas à **Conciliação em
+Conhecimento**? Ou deveria incluir também Conciliação em Execução em algum desses contextos?
+
+### Impacto técnico:
+Implementado em `sql/audiencias_realizadas_v2_draft.sql` (`parametros.tipo_conciliacao = ARRAY[1,
+32, 20, 33]`). Se a resposta incluir Conciliação em Execução, adicionar ids 2, 34, 36, 21, 35, 37
+ao array.
+
+---
+
 ## Anexo: Tabela de Referência Rápida
 
 | # | Assunto | Linha do Documento | Status na v2 | Risco |
 |---|---|---|---|---|
-| 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | Adiada por omissão | **Alto** (regressão possível) |
-| 2 | UNA → tipo fora do escopo (Enc. Instrução / Julgamento) — **hipótese: Efetiva**, por confirmar | 26–55 | Adiada por omissão | **Médio** (lacuna do documento) |
-| 3 | Instrução sem diligência e sem Julgamento | 57–73 | Adiada por omissão | **Médio** (lacuna do documento) |
-| 4 | Tipo 8 "Instrução e Julgamento" — **hipótese: sempre Efetiva** (exceto redesignação), relacionado à dúvida #1 | — | Adiada por omissão | **Médio** (fora do escopo original) |
-| 5 | Sentença terminativa × sentença de mérito | 81–84 | Apenas mérito | **Médio** (diferença de negócio) |
-| 6 | Perícia: avaliada quando? | 76 | Data de apuração (hoje) | **Médio** (semântica de reprocessamento) |
-| 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | Restrito aos 4 tipos | **Baixo** (improvável conflito real) |
+| 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | ✅ Resolvida (2026-09-28) — implementada | — |
+| 2 | UNA → Julgamento/Conciliação direto fora da janela — **hipótese: Efetiva**, por confirmar (escopo reduzido em 28/09) | 26–55 | Adiada por omissão fora da janela | **Baixo** (residual, maioria já coberta pela janela) |
+| 3 | Instrução sem diligência e sem Julgamento | 57–73 | ⚠️ Parcialmente resolvida (2026-09-28) — resíduo: nenhum sinal registrado | **Baixo** (residual, caso raro) |
+| 4 | Tipo 8 "Instrução e Julgamento" — **hipótese: sempre Efetiva** (exceto redesignação) | — | Hipótese implementada, não confirmada | **Médio** (fora do escopo original) |
+| 5 | Sentença terminativa × sentença de mérito | 81–84 | ✅ Resolvida (2026-09-28) — implementada, 27 códigos | — |
+| 6 | Perícia: avaliada quando? | 76 | ✅ Resolvida (2026-09-25) — implementada | — |
+| 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | ✅ Resolvida (2026-09-24) — implementada | — |
 | 8 | Dias úteis + abrangência municipal | 62–67 | Ignora município | **Baixo** (edge case) |
-| 9 | [Informativo] RS = Rito Sumário | Escopo | Assumido como Rito Sumário | **Baixo** (semântica) |
+| 9 | [Informativo] RS = Rito Sumário | Escopo | ✅ Resolvida (2026-09-24) — confirmado | — |
 | 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | Herda o padrão atual (`MAX(dt_audiencia)` exato) | **Alto** (perda de dados sem alerta) |
+| 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | Hipótese implementada (só Conciliação em Conhecimento) | **Médio** (afeta 3 regras: Inicial/UNA/Instrução) |
+
+**Pendentes reais (aguardando SETIC):** #4, #8, #10, #11. **Residuais de baixo risco:** #2, #3.
 
 ---
 
@@ -311,4 +451,5 @@ Para cada dúvida, esperamos:
 
 **Documento preparado por:** TRT-2 / Engenharia de Dados  
 **Data de preparação:** 2026-09-24  
+**Última atualização:** 2026-09-28 (documento SETIC revisado — 3 dúvidas resolvidas, 1 nova introduzida)  
 **Versão de referência:** v2 draft do algoritmo (sql/audiencias_realizadas_v2_draft.sql)
