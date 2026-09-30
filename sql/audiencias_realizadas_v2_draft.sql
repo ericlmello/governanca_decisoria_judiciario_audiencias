@@ -76,11 +76,10 @@
  * Geral (1) e a regra da Inicial (2) não têm janela.
  *
  * Abrangência do calendário de dias úteis (pje.tb_calendario_eventos): nacional
- * (id_orgao_julgador/id_estado/id_municipio IS NULL) ou estado de SP (id_estado = 26).
- * Abrangência municipal (suspensão restrita a um município específico) deveria também
- * restringir-se às varas daquele município, mas está PROVISORIAMENTE DESATIVADA
- * (id_municipio_vara sempre NULL) até se confirmar o caminho de schema que liga
- * pje.tb_orgao_julgador a um município (ver TODO(schema) em audiencias_realizadas).
+ * (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
+ * município específico da vara (id_municipio = id_municipio_vara) - granular, vale só para as
+ * varas daquele município. Município da vara obtido via tb_orgao_julgador.id_localizacao ->
+ * tb_localizacao.id_endereco -> tb_endereco.id_cep -> tb_cep.id_municipio.
  *
  * Watermark de carga (VAR_ULT_DT_AUDIENCIA): lido da própria tabela de destino
  * (SELECT MAX(dt_audiencia) FROM pai_2_0.audiencias WHERE status <> 'Programada') -
@@ -108,10 +107,9 @@ audiencias_realizadas AS (
         tpa.dt_inicio dta_audiencia,
         tp.nr_processo,
         toj.id_orgao_julgador,
-        NULL::integer AS id_municipio_vara, -- TODO(schema): pje.tb_orgao_julgador não tem
-            -- id_municipio direto; tb_localizacao e tb_endereco (via id_localizacao) também não.
-            -- Provisoriamente desativado (sempre NULL = abrangência municipal não filtra nada,
-            -- equivalente a nacional+estadual apenas) até o caminho correto ser confirmado.
+        tcep.id_municipio AS id_municipio_vara, -- município da vara, via
+            -- tb_orgao_julgador.id_localizacao -> tb_localizacao.id_endereco ->
+            -- tb_endereco.id_cep -> tb_cep.id_municipio
         tul.ds_nome AS magistrado,
         tpa.id_tipo_audiencia,
         tta.ds_tipo_audiencia,
@@ -131,6 +129,12 @@ audiencias_realizadas AS (
         pje.tb_sala_fisica ts ON ts.id_sala_fisica = tpa.id_sala_fisica
     INNER JOIN
         pje.tb_orgao_julgador toj ON toj.id_orgao_julgador = ts.id_orgao_julgador
+    LEFT JOIN
+        pje.tb_localizacao tloc ON tloc.id_localizacao = toj.id_localizacao
+    LEFT JOIN
+        pje.tb_endereco tend ON tend.id_endereco = tloc.id_endereco
+    LEFT JOIN
+        pje.tb_cep tcep ON tcep.id_cep = tend.id_cep
     INNER JOIN
         pje.tb_usuario_login tul ON tul.id_usuario = tpa.id_pessoa_realizador
     inner join tb_classe_judicial c
@@ -214,9 +218,8 @@ sentenca_ou_acordo_sem_janela AS (
 
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de pje.tb_calendario_eventos.
 -- Dia útil = não suspende audiência E não suspende prazo. Abrangência: nacional
--- (id_orgao_julgador/id_estado/id_municipio IS NULL) ou estado de SP (id_estado = 26).
--- Abrangência municipal provisoriamente desativada (id_municipio_vara sempre NULL, ver
--- audiencias_realizadas) até se confirmar o caminho de schema até o município da vara.
+-- (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
+-- município específico da vara (id_municipio = id_municipio_vara) - granular.
 -- Eventos com período (dt_*_final preenchido, ex.: recesso forense 20/12 a 20/01) bloqueiam o
 -- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
 -- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
