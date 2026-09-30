@@ -76,9 +76,11 @@
  * Geral (1) e a regra da Inicial (2) não têm janela.
  *
  * Abrangência do calendário de dias úteis (pje.tb_calendario_eventos): nacional
- * (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
- * município específico da vara (id_municipio = id_municipio_vara) - granular, vale só para as
- * varas daquele município.
+ * (id_orgao_julgador/id_estado/id_municipio IS NULL) ou estado de SP (id_estado = 26).
+ * Abrangência municipal (suspensão restrita a um município específico) deveria também
+ * restringir-se às varas daquele município, mas está PROVISORIAMENTE DESATIVADA
+ * (id_municipio_vara sempre NULL) até se confirmar o caminho de schema que liga
+ * pje.tb_orgao_julgador a um município (ver TODO(schema) em audiencias_realizadas).
  *
  * Watermark de carga (VAR_ULT_DT_AUDIENCIA): lido da própria tabela de destino
  * (SELECT MAX(dt_audiencia) FROM pai_2_0.audiencias WHERE status <> 'Programada') -
@@ -106,9 +108,10 @@ audiencias_realizadas AS (
         tpa.dt_inicio dta_audiencia,
         tp.nr_processo,
         toj.id_orgao_julgador,
-        toj.id_municipio AS id_municipio_vara, -- TODO(confirmar schema): assume que
-            -- pje.tb_orgao_julgador tem coluna id_municipio (órgão julgador vinculado a
-            -- comarca/município). Se o nome real da coluna for diferente, ajustar aqui.
+        NULL::integer AS id_municipio_vara, -- TODO(schema): pje.tb_orgao_julgador não tem
+            -- id_municipio direto; tb_localizacao e tb_endereco (via id_localizacao) também não.
+            -- Provisoriamente desativado (sempre NULL = abrangência municipal não filtra nada,
+            -- equivalente a nacional+estadual apenas) até o caminho correto ser confirmado.
         tul.ds_nome AS magistrado,
         tpa.id_tipo_audiencia,
         tta.ds_tipo_audiencia,
@@ -211,8 +214,9 @@ sentenca_ou_acordo_sem_janela AS (
 
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de pje.tb_calendario_eventos.
 -- Dia útil = não suspende audiência E não suspende prazo. Abrangência: nacional
--- (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
--- município específico da vara (id_municipio = id_municipio_vara) - granular.
+-- (id_orgao_julgador/id_estado/id_municipio IS NULL) ou estado de SP (id_estado = 26).
+-- Abrangência municipal provisoriamente desativada (id_municipio_vara sempre NULL, ver
+-- audiencias_realizadas) até se confirmar o caminho de schema até o município da vara.
 -- Eventos com período (dt_*_final preenchido, ex.: recesso forense 20/12 a 20/01) bloqueiam o
 -- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
 -- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
