@@ -23,10 +23,10 @@
  * - Fase 4c: Dashboard/queries de monitoramento
  * - Fase 4d: Alertas (ex.: regressão > 5%, perda de dados)
  *
- * CRÍTICO — Bloqueador Fase 4d (não bloqueia 4a-4c):
+ * CRÍTICO - Bloqueador Fase 4d (não bloqueia 4a-4c):
  * TODO(decisão SETIC #10): se VAR_ULT_DT_AUDIENCIA for mantido como watermark
  * autorreferente, implementar reprocessamento/upsert por (id_processo_audiencia,
- * versao_regra) — ver docs/analise, seção 6. Sem isso, há risco silencioso de
+ * versao_regra) - ver docs/analise, seção 6. Sem isso, há risco silencioso de
  * perda de dados.
  */
 
@@ -35,15 +35,15 @@
 -- ============================================================================
 -- Armazena CADA classificação produzida pela query v2.
 -- Chave: (id_processo_audiencia, versao_regra)
---   → permite rastrear mudanças de regra (ex.: v2.0 vs v2.1)
---   → permite reprocessamento por upsert (não duplica se re-rodado)
+--   -> permite rastrear mudanças de regra (ex.: v2.0 vs v2.1)
+--   -> permite reprocessamento por upsert (não duplica se re-rodado)
 --
 -- Colunas críticas:
 --   - data_calculo: quando foi calculado (auditoria, reprocessamento)
 --   - hash_condicoes_sinal: hash MD5 de (UNA+Instrução+Julgamento+...)
 --     para detectar mudanças silenciosas de regra sem mudança de versao_regra
 --   - motivo_classificacao: texto descrevendo qual regra gatilhou
---     (ex.: "Regra 2: Inicial → UNA subsequente")
+--     (ex.: "Regra 2: Inicial -> UNA subsequente")
 
 CREATE TABLE IF NOT EXISTS pai_2_0.fato_audiencia_classificada (
     -- Chave de deduplicação
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS pai_2_0.fato_audiencia_classificada (
     flg_incompetencia BOOLEAN DEFAULT FALSE, -- Regra 0: 941 ou 371
     flg_inicial_com_subsequente BOOLEAN DEFAULT FALSE, -- Regra 2
     flg_mesma_categoria_redesignada BOOLEAN DEFAULT FALSE, -- Regra 1
-    flg_una_bipartite BOOLEAN DEFAULT FALSE, -- Regra 3: UNA → Instrução
+    flg_una_bipartite BOOLEAN DEFAULT FALSE, -- Regra 3: UNA -> Instrução
     flg_diligencia_na_janela BOOLEAN DEFAULT FALSE, -- Regra 3/4
     flg_encerramento_instrucao_na_janela BOOLEAN DEFAULT FALSE, -- Regra 3a/4
     flg_julgamento_na_janela BOOLEAN DEFAULT FALSE, -- Regra 3b/4

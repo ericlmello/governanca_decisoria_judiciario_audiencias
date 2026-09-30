@@ -28,7 +28,7 @@
  *      janela de 3 dias úteis, independente de status ou prazo posterior. Perícia com prazo
  *      vencido não é tratada aqui (regra pertence ao painel de perícias do PAI, fora de escopo).
  *   6. Tipo 8 "Instrução e Julgamento": regra própria, sempre EFETIVA (exceto redesignação de
- *      mesma categoria, regra 1) — julgamento ocorre no mesmo ato, não depende de sinal
+ *      mesma categoria, regra 1) - julgamento ocorre no mesmo ato, não depende de sinal
  *      posterior como a Instrução comum.
  *   7. UNA seguida de tipo que não é UNA nem Instrução/Encerramento de Instrução (ex.: Julgamento
  *      ou Conciliação direto) -> EFETIVA, por analogia com a regra da Inicial.
@@ -40,12 +40,12 @@
  *   Instrução .................... 6, 12 (sumaríssimo), 24 (videoconf), 27 (videoconf sumaríssimo)
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
- *   Conciliação em Conhecimento .. 1, 32, 20, 33 (usada como SINAL, ver regras 2/3b/4b — não faz
+ *   Conciliação em Conhecimento .. 1, 32, 20, 33 (usada como SINAL, ver regras 2/3b/4b - não faz
  *                                  parte da população avaliada; Conciliação em Execução não conta)
  *   Instrução e Julgamento ....... 8 (regra própria, ver regra 6)
  *
  * Tipos totalmente fora da população avaliada: Conciliação em Conhecimento e em Execução (usadas
- * só como sinal, ver acima), Inquirição de testemunha — juízo deprecado (11, 26), Justificação
+ * só como sinal, ver acima), Inquirição de testemunha - juízo deprecado (11, 26), Justificação
  * Prévia (18), Mediação (13, 14, 15, 28), Pública (17, 30).
  *
  * Códigos de movimento (pje.tb_evento_processual / tpe.id_evento):
@@ -54,22 +54,22 @@
  *                                  452, 455, 466, 471, 11795, 50103
  *   Prolação de sentença SEM resolução de mérito / terminativa .. 218, 454, 457, 458, 459, 460,
  *                                  461, 462, 463, 464, 465, 472, 473
- *   Homologação de acordo ........ 466 (Homologada a transação — já incluído na lista acima, não
+ *   Homologação de acordo ........ 466 (Homologada a transação - já incluído na lista acima, não
  *                                  repetido separadamente)
  *   Expedição ofício/carta precatória/mandado .. não é movimento em tb_processo_evento; vem de
  *                                  tb_processo_expediente.id_tipo_processo_documento, join com
  *                                  tb_tipo_processo_documento.ds_tipo_processo_documento ILIKE
- *                                  ANY ('Ofício%', 'Carta Precatória%', 'Mandado%') — filtro por
+ *                                  ANY ('Ofício%', 'Carta Precatória%', 'Mandado%') - filtro por
  *                                  prefixo no catálogo estruturado, não no texto livre do evento.
  *   Perícia ativa ................ não é movimento em tb_processo_evento; vem de
- *                                  tb_processo_pericia (painel de perícias do PAI) — status
+ *                                  tb_processo_pericia (painel de perícias do PAI) - status
  *                                  aberto (L/S/A/M) + prazo válido
  *                                  (tb_proc_parte_expediente.dt_prazo_legal_parte >=
  *                                  CURRENT_DATE - 1 dia), via tb_processo_expediente com
  *                                  ds_origem_expediente = 'PERICIA'.
  *
  * Sinal legado de incompetência: ids 941 (Declarada a incompetência) e 371 (Acolhida a exceção
- * de incompetência) — herdado da query original, com prioridade máxima no CASE de
+ * de incompetência) - herdado da query original, com prioridade máxima no CASE de
  * classificacao, para todos os tipos avaliados (Inicial/UNA/Instrução).
  *
  * Janela de 3 dias úteis: aplica-se apenas onde indicado (regras 3 e 4, UNA/Instrução). A Regra
@@ -77,11 +77,11 @@
  *
  * Abrangência do calendário de dias úteis (pje.tb_calendario_eventos): nacional
  * (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
- * município específico da vara (id_municipio = id_municipio_vara) — granular, vale só para as
+ * município específico da vara (id_municipio = id_municipio_vara) - granular, vale só para as
  * varas daquele município.
  *
  * Watermark de carga (VAR_ULT_DT_AUDIENCIA): lido da própria tabela de destino
- * (SELECT MAX(dt_audiencia) FROM pai_2_0.audiencias WHERE status <> 'Programada') —
+ * (SELECT MAX(dt_audiencia) FROM pai_2_0.audiencias WHERE status <> 'Programada') -
  * autorreferente por design.
  */
 
@@ -152,7 +152,7 @@ audiencias_realizadas AS (
         -- 3 dias úteis varia por vara (calendário local), duas audiências do mesmo dia podem
         -- fechar a janela em datas diferentes; uma vez que qualquer audiência daquele dia (ou
         -- posterior) é gravada, `dt_inicio > ultima_dt` exclui permanentemente as demais do
-        -- mesmo dia ainda não processadas, mesmo que a janela delas feche depois — sem retry
+        -- mesmo dia ainda não processadas, mesmo que a janela delas feche depois - sem retry
         -- automático. Comportamento mantido intencionalmente.
         --
         -- Pré-filtro barato: 3 dias úteis exigem no mínimo 3 dias corridos. O corte real (janela
@@ -163,7 +163,7 @@ audiencias_realizadas AS (
 -- TODAS as audiências subsequentes (não só a próxima) designadas para o mesmo processo após a
 -- atual. Necessária porque, na bipartição UNA->Instrução, o "Encerramento de Instrução" e o
 -- "Julgamento" normalmente NÃO são a audiência imediatamente seguinte (esse lugar já é ocupado
--- pela Instrução) — são audiências posteriores a ela.
+-- pela Instrução) - são audiências posteriores a ela.
 audiencias_subsequentes AS (
     SELECT
         r.id_processo_audiencia,
@@ -176,7 +176,7 @@ audiencias_subsequentes AS (
         AND tpa2.dt_marcacao > r.dta_audiencia
 ),
 
--- Próxima audiência (a imediatamente seguinte, ordem = 1) — usada só para as checagens que de
+-- Próxima audiência (a imediatamente seguinte, ordem = 1) - usada só para as checagens que de
 -- fato dependem de "qual é a próxima": regra geral de mesma categoria, Inicial->qualquer
 -- subsequente, e UNA->Instrução/Encerramento define bipartição.
 proxima_audiencia AS (
@@ -188,9 +188,9 @@ proxima_audiencia AS (
     WHERE ordem = 1
 ),
 
--- Sinal de prolação de sentença/acordo homologado SEM nova audiência designada — trigger
+-- Sinal de prolação de sentença/acordo homologado SEM nova audiência designada - trigger
 -- adicional da regra da Inicial ("... ou ocorre a prolação da sentença"). SEM janela de 3 dias
--- úteis, igual às demais checagens da Regra 1/2 (só UNA/Instrução têm janela) — por isso não
+-- úteis, igual às demais checagens da Regra 1/2 (só UNA/Instrução têm janela) - por isso não
 -- reaproveita movimentos_julgamento (que É limitada pela janela de calendario_3du), e sim
 -- reimplementa a mesma lista de códigos sem o filtro de data superior.
 sentenca_ou_acordo_sem_janela AS (
@@ -212,13 +212,13 @@ sentenca_ou_acordo_sem_janela AS (
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de pje.tb_calendario_eventos.
 -- Dia útil = não suspende audiência E não suspende prazo. Abrangência: nacional
 -- (id_orgao_julgador/id_estado/id_municipio IS NULL), estado de SP (id_estado = 26), ou
--- município específico da vara (id_municipio = id_municipio_vara) — granular.
+-- município específico da vara (id_municipio = id_municipio_vara) - granular.
 -- Eventos com período (dt_*_final preenchido, ex.: recesso forense 20/12 a 20/01) bloqueiam o
 -- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
 -- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
 -- funciona tanto se for boolean ('true') quanto char ('S').
 -- TODO(confirmar): existem registros com dt_ano NULL (feriado fixo recorrente)? Se sim, hoje
--- eles são ignorados — rodar: SELECT COUNT(*) FROM pje.tb_calendario_eventos WHERE dt_ano IS NULL;
+-- eles são ignorados - rodar: SELECT COUNT(*) FROM pje.tb_calendario_eventos WHERE dt_ano IS NULL;
 calendario_3du AS (
     SELECT
         r.id_processo_audiencia,
@@ -257,17 +257,17 @@ calendario_3du AS (
 -- (id_processo_trf, dt_criacao_expediente, id_tipo_processo_documento), que já é usada aqui
 -- mesmo para perícia (join via tb_proc_parte_expediente). O campo id_tipo_processo_documento
 -- referencia tb_tipo_processo_documento (id_tipo_processo_documento, ds_tipo_processo_documento,
--- in_ativo), que tem os tipos ofício/carta precatória/mandado — inclusive vários subtipos
+-- in_ativo), que tem os tipos ofício/carta precatória/mandado - inclusive vários subtipos
 -- específicos e ativos (ex.: "Mandado de Citação", "Carta Precatória Executória", "Ofício
 -- Precatório"), então o filtro usa ILIKE por PREFIXO no nome canônico (não no texto livre do
 -- evento), o que é robusto porque o vocabulário é controlado (catálogo), não texto digitado.
 -- ds_origem_expediente NÃO diferencia por tipo de documento (valores confirmados: LEGADO,
--- INTIMACAO_AUTOMATICA, NOTIFICACAO_EXPRESSA, PEC_FLUXO, PEC_MENU, PERICIA) — é outra dimensão
+-- INTIMACAO_AUTOMATICA, NOTIFICACAO_EXPRESSA, PEC_FLUXO, PEC_MENU, PERICIA) - é outra dimensão
 -- (canal/origem de geração do expediente), por isso a diferenciação usa
 -- tb_tipo_processo_documento, não esse campo.
 --
 -- Perícia ativa: query do "painel de perícias do PAI" (mesma consulta usada tanto para prazo
--- válido quanto vencido — a diferença está em como o prazo é interpretado depois). Aqui só
+-- válido quanto vencido - a diferença está em como o prazo é interpretado depois). Aqui só
 -- entra a perícia ATIVA (laudo em aberto) com PRAZO VÁLIDO; prazo vencido segue as regras do
 -- painel de perícias do PAI (fora de escopo, ver regra 5 do cabeçalho).
 -- Perícia MARCADA dentro da janela de 3 dias úteis (pp.dt_marcacao) conta como diligência,
@@ -319,11 +319,11 @@ incompetencia_na_janela AS (
         AND tpe.id_evento IN (941, 371) -- Declarada a incompetência / Acolhida exceção de incompetência
 ),
 
--- Encerramento de Instrução designado dentro da janela de 3 dias úteis — checagem GERAL
+-- Encerramento de Instrução designado dentro da janela de 3 dias úteis - checagem GERAL
 -- (qualquer audiência subsequente desse tipo dentro da janela, via audiencias_subsequentes),
 -- não só "a próxima". Na bipartição UNA->Instrução, o Encerramento normalmente vem DEPOIS da
 -- Instrução (que já ocupa o lugar de "próxima"). A designação de Encerramento de Instrução é
--- exigida JUNTO com a diligência para o resultado Efetiva — não basta a diligência sozinha.
+-- exigida JUNTO com a diligência para o resultado Efetiva - não basta a diligência sozinha.
 encerramento_instrucao_na_janela AS (
     SELECT DISTINCT s.id_processo_audiencia
     FROM audiencias_subsequentes s
@@ -340,7 +340,7 @@ encerramento_instrucao_na_janela AS (
 --     219/220/221/442/444/446/448/450/452/455/466/471/11795/50103) quanto SEM resolução de
 --     mérito/terminativa (guarda-chuva 218: 454/457/458/459/460/461/462/463/464/465/472/473).
 --     Ambas contam como "Prolação de sentença".
---   - Homologação de acordo: termo técnico trabalhista é "transação" — código 466 "Homologada
+--   - Homologação de acordo: termo técnico trabalhista é "transação" - código 466 "Homologada
 --     a transação" (já incluído na lista de mérito acima, não repetido separadamente).
 --   - Marcação de audiência de Julgamento OU Conciliação: QUALQUER audiência subsequente desses
 --     tipos dentro da janela (via audiencias_subsequentes), mesmo raciocínio do Encerramento de
@@ -376,7 +376,7 @@ classificacao AS (
     SELECT
         r.*,
         CASE
-            -- 0) Sinal legado (incompetência) — prioridade máxima, igual à query original.
+            -- 0) Sinal legado (incompetência) - prioridade máxima, igual à query original.
             --    Vale para todos os tipos avaliados.
             WHEN inc.id_processo_audiencia IS NOT NULL THEN 'Efetiva'
 
@@ -384,14 +384,14 @@ classificacao AS (
             --    videoconferência via os arrays de parametros. Inclui tipo_instrucao_julgamento
             --    (tipo 8): redesignado como novo tipo 8 sinaliza que o julgamento NÃO ocorreu no
             --    ato original, então a regra geral prevalece sobre a regra própria do tipo 8
-            --    (item 1.5 abaixo) — por isso vem primeiro no CASE.
+            --    (item 1.5 abaixo) - por isso vem primeiro no CASE.
             WHEN (r.id_tipo_audiencia = ANY (p.tipo_inicial) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_inicial))
               OR (r.id_tipo_audiencia = ANY (p.tipo_una) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_una))
               OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao))
               OR (r.id_tipo_audiencia = ANY (p.tipo_instrucao_julgamento) AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao_julgamento))
                 THEN 'Adiada'
 
-            -- 1.5) Tipo 8 "Instrução e Julgamento" — julgamento ocorre no mesmo ato, não depende
+            -- 1.5) Tipo 8 "Instrução e Julgamento" - julgamento ocorre no mesmo ato, não depende
             --      de sinal posterior (diferente da Instrução comum, que precisa de um sinal
             --      futuro para provar que "funcionou"). Sempre Efetiva, exceto redesignação de
             --      mesma categoria (já tratada na regra 1 acima, com prioridade por vir antes).
@@ -406,7 +406,7 @@ classificacao AS (
             -- 3) UNA -> Instrução OU Encerramento de Instrução (bipartição). A avaliação de
             --    diligência se aplica tanto quando a próxima audiência é Instrução quanto quando
             --    é Encerramento de Instrução DIRETO (pulando a Instrução). "Efetiva" por
-            --    diligência exige TAMBÉM Encerramento de Instrução designado — não basta a
+            --    diligência exige TAMBÉM Encerramento de Instrução designado - não basta a
             --    diligência sozinha.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
                  AND pa.id_tipo_audiencia_proxima = ANY (p.tipo_instrucao || p.tipo_encerramento_instrucao)
@@ -427,14 +427,14 @@ classificacao AS (
                  THEN 'Adiada'
 
             -- 3d) UNA seguida de qualquer OUTRO tipo avaliado que não seja mesma categoria
-            --     (regra 1) nem Instrução/Encerramento de Instrução (bipartição, regras 3a-3c) —
+            --     (regra 1) nem Instrução/Encerramento de Instrução (bipartição, regras 3a-3c) -
             --     na prática, Julgamento ou Conciliação designados diretamente fora da janela de
             --     3 dias úteis (dentro da janela já são capturados por mj/regra 3b). Conta como
             --     Efetiva, por analogia com a regra da Inicial.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_una)
                  AND pa.id_tipo_audiencia_proxima IS NOT NULL THEN 'Efetiva'
 
-            -- 4) Instrução — mesma lógica de exigir Encerramento de Instrução junto com a
+            -- 4) Instrução - mesma lógica de exigir Encerramento de Instrução junto com a
             --    diligência aplicada à UNA.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NOT NULL
@@ -454,7 +454,7 @@ classificacao AS (
                 THEN 'Adiada'
 
             -- Instrução sem diligência, sem Julgamento/Conciliação designado e sem Encerramento
-            -- de Instrução designado — nenhum sinal registrado. Cai aqui por omissão (Adiada).
+            -- de Instrução designado - nenhum sinal registrado. Cai aqui por omissão (Adiada).
             ELSE 'Adiada'
         END AS status
     FROM audiencias_realizadas r

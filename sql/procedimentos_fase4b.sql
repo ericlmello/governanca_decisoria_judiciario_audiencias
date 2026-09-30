@@ -12,7 +12,7 @@
  * - Fase 5 (Produção): Invocar via cron/Airflow/job agendado
  *
  * Bloqueador Fase 4d: Decisão SETIC #10 sobre watermark (rolling window vs. config table)
- * → seção no final deste arquivo cobre ambas as opções
+ * -> seção no final deste arquivo cobre ambas as opções
  */
 
 -- ============================================================================
@@ -63,7 +63,7 @@ BEGIN
 
     BEGIN
         -- PASSO 1: Determinar watermark de entrada
-        -- Autorreferente — mantido assim por decisão da SETIC (Dúvida #10, 2026-09-30, risco
+        -- Autorreferente - mantido assim por decisão da SETIC (Dúvida #10, 2026-09-30, risco
         -- de perda silenciosa aceito conscientemente). Ver seção "Decisão SETIC #10" ao final.
         SELECT MAX(dt_audiencia) INTO v_watermark_entrada
         FROM pai_2_0.audiencias
@@ -375,25 +375,25 @@ END;
 $$;
 
 -- ============================================================================
--- DECISÃO SETIC #10: Reprocessamento e Watermark — RESOLVIDA (2026-09-30)
+-- DECISÃO SETIC #10: Reprocessamento e Watermark - RESOLVIDA (2026-09-30)
 -- ============================================================================
 /*
  * SETIC decidiu MANTER o watermark exatamente como está hoje (autorreferente,
  * SELECT MAX(dt_audiencia) exato, sem margem de segurança). As opções A (rolling window -45
- * dias) e B (config table externa) abaixo foram propostas mas NÃO devem ser implementadas —
+ * dias) e B (config table externa) abaixo foram propostas mas NÃO devem ser implementadas -
  * mantidas aqui só como referência histórica, caso a decisão mude no futuro.
  *
  * Risco aceito conscientemente pela SETIC: perda silenciosa de audiências quando duas do mesmo
- * dia têm janelas de 3 dias úteis diferentes (calendário varia por vara) — ver comentário em
+ * dia têm janelas de 3 dias úteis diferentes (calendário varia por vara) - ver comentário em
  * audiencias_realizadas_v2_draft.sql.
  *
  * ---
  *
- * [HISTÓRICO — NÃO IMPLEMENTAR] OPÇÃO A: Rolling Window
+ * [HISTÓRICO - NÃO IMPLEMENTAR] OPÇÃO A: Rolling Window
  *   SELECT MAX(dt_audiencia) - INTERVAL '45 days' INTO v_watermark_entrada ...
  *   Sempre reprocessa últimos 45 dias; UPSERT garante dedup. Custo: +5-10% I/O.
  *
- * [HISTÓRICO — NÃO IMPLEMENTAR] OPÇÃO B: Marca d'Água Externa
+ * [HISTÓRICO - NÃO IMPLEMENTAR] OPÇÃO B: Marca d'Água Externa
  *   Tabela config_watermark separada, lida/atualizada a cada execução. Mais auditável, mas
  *   requer schema change e sincronismo entre query e UPDATE.
  */
