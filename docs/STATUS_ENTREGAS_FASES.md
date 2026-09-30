@@ -1,18 +1,18 @@
 # Status de Entregas por Fase
 
-**Data de compilação:** 2026-09-25 (Atualizado 2026-09-28)  
-**Status geral:** Fase 2 ~90% completa (documento SETIC revisado resolveu #1, #5, #3 parcial); Fase 3 planejada; Fases 4–5 completas aguardando Fase 3
+**Data de compilação:** 2026-09-25 (Atualizado 2026-09-30)  
+**Status geral:** Fase 2 completa (9 de 11 dúvidas resolvidas; só 2 residuais de baixo risco); Fase 3 pode iniciar; Fases 4–5 completas
 
 ---
 
-## ATUALIZAÇÃO 2026-09-28 — Documento SETIC Revisado
+## ATUALIZAÇÃO 2026-09-30 — SETIC Confirmou Dúvidas #8, #10, #11
 
-A SETIC enviou uma versão revisada do documento "PAI - Critérios Audiências SETIC", resolvendo
-as Dúvidas #1 (Inicial sem nova audiência) e #5 (sentença terminativa) totalmente, e #3
-(Instrução sem diligência/Julgamento) parcialmente. Também introduziu Conciliação como sinal
-válido (Inicial/UNA/Instrução) e uma nova dúvida (#11, mapeamento do tipo Conciliação). Todas as
-mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
-`docs/DUVIDAS_SETIC_Criterios_Audiencias.md` para o detalhamento completo.
+Restava confirmação de 3 dúvidas: abrangência municipal do calendário (#8, opção a — granular,
+implementado no `calendario_3du`), watermark autorreferente (#10 — mantido como está, risco
+aceito conscientemente) e mapeamento de Conciliação (#11 — só "em Conhecimento", já era a
+hipótese implementada). Todas confirmadas e implementadas em
+`sql/audiencias_realizadas_v2_draft.sql`. Não há mais bloqueador formal para Fase 2 — restam só
+2 residuais de baixo risco (#2, #3) que não impedem nada.
 
 ---
 
@@ -21,10 +21,10 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
 | 1 | Análise de regras | ✅ Completo | — | ✅ Concluído |
-| 2 | Query v2 + bugs | ⚠️ ~90% completo | SETIC #8, #10, #11 (residuais #2/#3 baixo risco) | Aguardar respostas restantes |
-| 3 | Testes ~100k | 📋 Pronto (40+ casos) | Acesso a banco de dados real | Pode iniciar já (regras críticas resolvidas) |
-| 4 | Monitoramento | ✅ 4a–4c completo | SETIC #10 (só 4d) | ✅ Pronto; 4d após resposta |
-| 5 | Produção | ✅ Guia pronto | Fase 3 OK + Fase 4 | Pronto; deploy após Fase 3 ✅ |
+| 2 | Query v2 + bugs | ✅ Completo (residuais #2/#3 baixo risco) | — | ✅ Concluído |
+| 3 | Testes ~100k | 📋 Pronto (40+ casos) | Acesso a banco de dados real | Pode iniciar já |
+| 4 | Monitoramento | ✅ 4a–4c completo | — | ✅ Pronto |
+| 5 | Produção | ✅ Guia pronto | Fase 3 OK | Pronto; deploy após Fase 3 ✅ |
 
 ---
 
@@ -60,7 +60,7 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
   - ✅ Dúvida #3 parcialmente resolvida e implementada (2026-09-28)
   - ✅ Dúvida #6 (perícia) resolvida e implementada (2026-09-25)
   - Regras para dúvida #2 implementada como hipótese (escopo reduzido em 28/09); dúvida #4 confirmada pela SETIC em 29/09
-  - TODOs/premissas remanescentes: dúvidas #2 (residual), #3 (residual), #8, #10, #11
+  - TODOs/premissas remanescentes: apenas dúvidas #2 e #3 (residuais de baixo risco)
 
 ### Bloqueadores Críticos
 | Dúvida | Tópico | Status | Impacto | Prioridade |
@@ -71,12 +71,12 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
 | #4 | Tipo 8 "Instrução e Julgamento" | ✅ Resolvida (2026-09-29) | — | ✅ IMPLEMENTADA |
 | #5 | Sentença terminativa = "prolação"? | ✅ Resolvida (2026-09-28) | — | ✅ IMPLEMENTADA |
 | #6 | Perícia ativa avaliada quando? | ✅ Resolvida (2026-09-25) | — | ✅ IMPLEMENTADA |
-| #8 | Calendário: abrangência municipal? | Aberta | Baixo | Opcional (SP only) |
-| #10 | Watermark autorreferente | Aberta | **Alto** (arquitetura) | NÃO bloqueia Fases 3–4a |
-| #11 | Mapeamento exato de "Conciliação" | Aberta (NOVA 2026-09-28) | Médio | Hipótese implementada |
+| #8 | Calendário: abrangência municipal? | ✅ Resolvida (2026-09-30) | — | ✅ IMPLEMENTADA |
+| #10 | Watermark autorreferente | ✅ Resolvida (2026-09-30) — mantido como está | — | ✅ IMPLEMENTADA |
+| #11 | Mapeamento exato de "Conciliação" | ✅ Resolvida (2026-09-30) | — | ✅ IMPLEMENTADA |
 
 ### O que falta para finalizar Fase 2
-- [ ] Resposta SETIC às dúvidas restantes (#8, #10, #11 — prioritárias; #2/#3 residuais de baixo risco)
+- [ ] Confirmação dos 2 residuais de baixo risco (#2, #3) — não bloqueia nada
 - [ ] Implementar lógica conforme respostas (se diferente das hipóteses já assumidas)
 - [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvidas #1, #5, #6, 3-parcial)
 
@@ -95,8 +95,6 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
 
 ### Bloqueadores
 - ⏳ Acesso a banco de dados (~100k audiências reais) — **único bloqueador real restante**
-- Dúvidas #8, #10, #11 não bloqueiam o início dos testes (hipóteses já implementadas,
-  testes podem rodar e ser reexecutados se a resposta SETIC mudar a lógica)
 
 ### O que fazer agora (já pode iniciar)
 1. Obter acesso a ambiente DEV/QA com dados reais
@@ -147,19 +145,18 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
 - `v_distribuicao_tipos_audiencia`: % Efetiva por tipo de audiência
 - Pronto para Grafana/Metabase/Power BI
 
-#### 4d: Reprocessamento Automático (⏳ Bloqueado por SETIC #10)
-- Usa decisão sobre watermark (comentário em procedimentos_fase4b.sql)
-- Se Opção A (Rolling Window): MAX(dt_audiencia) - 45 dias
-- Se Opção B (Config Table): marca d'água externa
-- Default implementado: Opção A (conservador, seguro)
+#### 4d: Reprocessamento Automático (✅ Descontinuado — SETIC decidiu manter watermark como está)
+- SETIC confirmou (2026-09-30, Dúvida #10): manter watermark autorreferente, sem rolling window
+  nem config table. Risco de perda silenciosa aceito conscientemente.
+- Propostas de mitigação mantidas em `sql/procedimentos_fase4b.sql` só como referência histórica.
 
 ### Bloqueadores
-- ⏳ Resposta SETIC a dúvida #10 (watermark) — para implementar 4d
+- Nenhum — SETIC confirmou manter o watermark autorreferente (2026-09-30); 4d descontinuado
 
-### O que fazer antes de respostas SETIC
+### Próximos passos
 - [x] Código das tabelas pronto (criar em DEV)
-- [ ] Implementar Procedure (4b) para alimentar `fato_audiencia_classificada`
-- [ ] Implementar Views (4c) para monitoramento
+- [x] Procedure (4b) implementada
+- [x] Views (4c) implementadas
 - [ ] Criar dashboard básico (ex.: Tableau/Metabase)
 
 ---
@@ -167,8 +164,7 @@ mudanças já implementadas em `sql/audiencias_realizadas_v2_draft.sql`. Ver
 ## Fase 5: Produção ✅ (Pronto para Deploy)
 
 ### Requisitos
-- ✅ Fase 2 substancialmente finalizada (dúvidas críticas #1, #5 resolvidas; #3 parcial; residuais
-  #8/#10/#11 não bloqueiam produção com as hipóteses já implementadas)
+- ✅ Fase 2 finalizada (9 de 11 dúvidas confirmadas pela SETIC; só 2 residuais de baixo risco)
 - ⏳ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
 - ✅ Fase 4a–4c operacional (monitoramento em funcionamento)
 
@@ -198,14 +194,14 @@ Responder formalmente a dúvidas:
 - [x] #1: Inicial sem nova audiência → **Efetiva (via "prolação da sentença"), respondido 2026-09-28**
 - [x] #6: Perícia ativa avaliada quando? **→ Opção (c) Marcada na janela (2026-09-25)**
 - [x] #5: Sentença terminativa conta como "prolação de sentença"? **→ SIM, respondido 2026-09-28**
-- [ ] #3 (residual): Instrução sem NENHUM sinal (nem diligência, nem Julgamento/Encerramento) → Adiada por omissão, confirmar?
-- [ ] #2 (residual): UNA → Julgamento/Conciliação direto fora da janela → Efetiva, confirmar?
+- [ ] #3 (residual, baixo risco): Instrução sem NENHUM sinal (nem diligência, nem Julgamento/Encerramento) → Adiada por omissão, confirmar?
+- [ ] #2 (residual, baixo risco): UNA → Julgamento/Conciliação direto fora da janela → Efetiva, confirmar?
 - [x] #4: Tipo 8 "Instrução e Julgamento" → **sempre Efetiva, confirmado 2026-09-29**
-- [ ] #8: Calendário suspensão municipal (granular, estadual ou nacional)?
-- [ ] #10: Watermark autorreferente é intencional? Existe reprocessamento?
-- [ ] #11 (NOVA): Conciliação em Conhecimento apenas, ou também Execução?
+- [x] #8: Calendário suspensão municipal → **Opção (a) granular, confirmado 2026-09-30**
+- [x] #10: Watermark autorreferente → **manter como está, risco aceito, confirmado 2026-09-30**
+- [x] #11: Conciliação → **só em Conhecimento, confirmado 2026-09-30**
 
-**Prazo sugerido:** Máx. 2 semanas a partir de 2026-09-28 (2026-10-12) para as restantes
+Nenhum bloqueador formal restante. #2 e #3 são residuais de baixo risco (hipótese já implementada).
 
 ### O que pode acontecer em PARALELO (não aguarda SETIC)
 - [x] Fase 3: Plano de testes estruturado (pronto para executar quando respostas chegarem)
@@ -227,7 +223,7 @@ Responder formalmente a dúvidas:
  ↓
 2026-10-10    Fase 3 executada (testes com ~100k)
  ↓
-2026-10-12    Resposta SETIC esperada (dúvidas restantes #8/#10/#11)
+2026-09-30    Dúvidas #8/#10/#11 confirmadas — nenhum bloqueador formal restante
  ↓
 2026-10-17    Fase 4a–4c operacional + Fase 3 aprovada
  ↓
@@ -263,5 +259,5 @@ Responder formalmente a dúvidas:
 
 ---
 
-**Última atualização:** 2026-09-28 (documento SETIC revisado — dúvidas #1/#5 resolvidas, #3 parcial)  
-**Próxima revisão:** Quando respostas às dúvidas restantes chegarem (#8, #10, #11 — esperado 2026-10-12)
+**Última atualização:** 2026-09-30 (dúvidas #8/#10/#11 confirmadas pela SETIC — 9 de 11 resolvidas)  
+**Próxima revisão:** Quando Fase 3 (testes) for executada, ou dúvidas residuais #2/#3 forem confirmadas

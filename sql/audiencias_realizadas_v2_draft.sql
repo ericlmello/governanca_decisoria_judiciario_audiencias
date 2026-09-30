@@ -24,11 +24,16 @@
  * Encerramento de Instrução (sem diligência) agora seguem a MESMA avaliação da bipartição
  * (antes caíam automaticamente em Efetiva pela regra "avança de categoria").
  * Dúvida #4 (tipo 8 "Instrução e Julgamento" sempre Efetiva) -> RESPONDIDA "Sim" pela SETIC em
- * 2026-09-29 (confirmação por email, fora do documento). Hipótese passa de "não confirmada" para
- * "confirmada" nos comentários abaixo.
- * Ainda pendentes: Dúvida #10 (watermark autorreferente) e Dúvida #8 (calendário municipal).
- * NOVA dúvida introduzida por esta atualização: mapeamento exato de "Conciliação" (usamos
- * Conciliação em Conhecimento — ids 1/32/20/33 — não Conciliação em Execução), a confirmar.
+ * 2026-09-29 (confirmação por email, fora do documento).
+ * Dúvida #8 (calendário: abrangência municipal) -> RESPONDIDA em 2026-09-30: opção (a),
+ * granular — suspensão de município específico vale só para as varas daquele município. Ver
+ * CTE calendario_3du abaixo.
+ * Dúvida #10 (watermark autorreferente) -> RESPONDIDA em 2026-09-30: SETIC decidiu MANTER
+ * VAR_ULT_DT_AUDIENCIA como está (autorreferente, sem rolling window nem config table). Risco
+ * de perda silenciosa (ver seção de watermark abaixo) foi aceito conscientemente — não
+ * implementar as opções A/B propostas anteriormente sem nova decisão.
+ * Dúvida #11 (mapeamento de "Conciliação") -> RESPONDIDA em 2026-09-30: confirmado apenas
+ * Conciliação em Conhecimento (ids 1/32/20/33), NÃO Conciliação em Execução.
  *
  * Regras implementadas (ver seção 2 do doc de análise):
  *   0. Sinal legado (incompetência declarada/exceção de incompetência acolhida) -> EFETIVA,
@@ -101,7 +106,7 @@
  *   Encerramento de Instrução .... 10, 25 (videoconf)
  *   Julgamento ................... 4
  *   Conciliação em Conhecimento .. 1, 32, 20, 33 (usada como SINAL, não faz parte da população
- *                                  avaliada — ver premissa a confirmar abaixo)
+ *                                  avaliada — CONFIRMADO pela SETIC em 2026-09-30, ver abaixo)
  *   Instrução e Julgamento ....... 8 (regra própria, ver DECIDIDO abaixo — não está no documento)
  *
  * DECIDIDO pelo usuário: ids 7 ("UNA-RS ou Justificação Prévia") e 9 ("Una - RS") entram no
@@ -110,11 +115,10 @@
  * "RS" significar outra coisa, ou se o "ou Justificação Prévia" do id 7 for relevante em algum
  * caso, revisar este mapeamento.
  *
- * PREMISSA a confirmar (documento atualizado 2026-09-28 introduziu "Conciliação" como sinal,
- * sem especificar qual subtipo): usamos apenas Conciliação em Conhecimento (1, 32, 20, 33), NÃO
- * Conciliação em Execução (2, 34, 36, 21, 35, 37) — esta última é fase pós-julgamento,
- * temporalmente incompatível com um sinal restrito a poucos dias úteis após a audiência de
- * conhecimento (Inicial/UNA/Instrução). Ver nova dúvida em docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+ * ✅ CONFIRMADO PELA SETIC (2026-09-30, Dúvida #11): usamos apenas Conciliação em Conhecimento
+ * (1, 32, 20, 33), NÃO Conciliação em Execução (2, 34, 36, 21, 35, 37) — esta última é fase
+ * pós-julgamento, temporalmente incompatível com um sinal restrito a poucos dias úteis após a
+ * audiência de conhecimento (Inicial/UNA/Instrução).
  *
  * DECIDIDO pelo usuário: tipos totalmente fora da população avaliada (Conciliação em Conhecimento
  * e em Execução — usados só como SINAL, ver acima —, Inquirição de testemunha — juízo deprecado
@@ -177,13 +181,10 @@ WITH parametros AS (
         ARRAY[8]                   AS tipo_instrucao_julgamento, -- "Instrução e Julgamento":
             -- julgamento no mesmo ato; regra própria (ver classificacao), não segue a árvore
             -- normal da Instrução
-        ARRAY[1, 32, 20, 33]       AS tipo_conciliacao -- Conciliação em Conhecimento. NOVO
-            -- (documento atualizado 2026-09-28): "Conciliação" passou a ser sinal explícito de
-            -- Efetiva (Inicial/UNA/Instrução). PREMISSA a confirmar: usamos só "Conciliação em
-            -- Conhecimento" (1, 32, 20, 33), não "Conciliação em Execução" (2, 34, 36, 21, 35, 37)
-            -- — esta última é fase pós-julgamento, temporalmente incompatível com um sinal restrito
-            -- a poucos dias úteis após a audiência de conhecimento. Ver dúvida nova em
-            -- docs/DUVIDAS_SETIC_Criterios_Audiencias.md.
+        ARRAY[1, 32, 20, 33]       AS tipo_conciliacao -- Conciliação em Conhecimento.
+            -- "Conciliação" é sinal explícito de Efetiva (Inicial/UNA/Instrução).
+            -- ✅ CONFIRMADO PELA SETIC (2026-09-30, Dúvida #11): apenas "Conciliação em
+            -- Conhecimento" (1, 32, 20, 33), NÃO "Conciliação em Execução" (2, 34, 36, 21, 35, 37).
 ),
 
 audiencias_realizadas AS (
@@ -193,6 +194,10 @@ audiencias_realizadas AS (
         tpa.dt_inicio dta_audiencia,
         tp.nr_processo,
         toj.id_orgao_julgador,
+        toj.id_municipio AS id_municipio_vara, -- Resposta SETIC Dúvida #8 (2026-09-30): abrangência
+            -- municipal. TODO(confirmar schema): assume que pje.tb_orgao_julgador tem coluna
+            -- id_municipio (padrão PJe — órgão julgador vinculado a comarca/município). Se o nome
+            -- real da coluna for diferente, ajustar aqui.
         tul.ds_nome AS magistrado,
         tpa.id_tipo_audiencia,
         tta.ds_tipo_audiencia,
@@ -233,19 +238,21 @@ audiencias_realizadas AS (
         --   SELECT MAX(dt_audiencia) AS ultima_dt
         --   FROM pai_2_0.audiencias
         --   WHERE status <> 'Programada'
-        -- Ou seja, é AUTORREFERENTE: a query lê da mesma tabela em que grava. Isso reforça o
-        -- TODO(confirmar) abaixo — não é só uma variação teórica, é o padrão de carga real.
+        -- Ou seja, é AUTORREFERENTE: a query lê da mesma tabela em que grava.
         --
         -- Pré-filtro barato: 3 dias úteis exigem no mínimo 3 dias corridos. O corte real (janela
         -- já fechada) é feito no SELECT final, sobre calendario_3du.limite_3_dias_uteis — o antigo
         -- buffer fixo de 10 dias classificava cedo demais audiências perto do recesso forense.
-        -- TODO(confirmar): como o limite varia por vara (calendário local), duas audiências do
-        -- mesmo dia podem fechar a janela em datas diferentes. Com o watermark acima (MAX(dt_audiencia)
-        -- já gravado), uma audiência cuja janela fecha depois de outra do mesmo dia pode nunca
-        -- ser reprocessada, pois `dt_inicio > ultima_dt` a exclui permanentemente assim que
-        -- QUALQUER audiência daquele dia (ou depois) for gravada primeiro. Recomendado: usar uma
-        -- sobra de segurança (ex.: MAX(dt_audiencia) - 45 dias, não o valor exato) com gravação
-        -- por upsert na chave (id_processo_audiencia, versao_regra) — ver docs/analise, seção 6.
+        --
+        -- ✅ RESPOSTA SETIC (Dúvida #10, 2026-09-30): manter o watermark exatamente como está
+        -- (autorreferente, sem rolling window nem config table externa). Risco conhecido e
+        -- ACEITO conscientemente: como o limite de 3 dias úteis varia por vara (calendário
+        -- local), duas audiências do mesmo dia podem fechar a janela em datas diferentes; uma
+        -- vez que QUALQUER audiência daquele dia (ou posterior) é gravada, `dt_inicio > ultima_dt`
+        -- exclui permanentemente as demais do mesmo dia ainda não processadas, mesmo que a janela
+        -- delas feche depois — sem retry automático. Não implementar as opções de mitigação
+        -- (rolling window -45 dias / config table) propostas anteriormente sem nova decisão da
+        -- SETIC. Ver docs/DUVIDAS_SETIC_Criterios_Audiencias.md, Dúvida #10.
         and date_trunc('day', tpa.dt_fim) <= date_trunc('day', current_date - 4)
 ),
 
@@ -305,12 +312,10 @@ sentenca_ou_acordo_sem_janela AS (
 
 -- Data-limite do 3º dia útil após a audiência, calculada a partir de
 -- pje.tb_calendario_eventos. Regra definida pelo usuário: dia útil = não suspende
--- audiência E não suspende prazo. Abrangência: nacional (id_orgao_julgador/id_estado
--- IS NULL) ou estado de SP (id_estado = 26).
--- TODO(decisão SETIC): id_municipio não está sendo considerado (regra hoje só cobre nacional
--- + estado de SP). Se um registro do calendário suspender audiência/prazo só num município
--- específico (não no estado inteiro), esse dia deve contar como não-útil apenas para as varas
--- daquele município, ou nacional+estadual já é suficiente?
+-- audiência E não suspende prazo. Abrangência: nacional (id_orgao_julgador/id_estado/
+-- id_municipio IS NULL), estado de SP (id_estado = 26), OU município específico da vara
+-- (id_municipio = id_municipio_vara) — RESOLVIDO Dúvida #8 (2026-09-30): abrangência municipal
+-- é granular, vale só para as varas daquele município (opção a).
 -- Eventos com período (dt_*_final preenchido, ex.: recesso forense 20/12 a 20/01) bloqueiam o
 -- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
 -- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
@@ -337,6 +342,7 @@ calendario_3du AS (
                         AND (ce.in_suspende_prazo::text IN ('S', 'true') OR ce.in_suspende_audiencia = 'S')
                         AND (ce.id_orgao_julgador IS NULL OR ce.id_orgao_julgador = r.id_orgao_julgador)
                         AND (ce.id_estado IS NULL OR ce.id_estado = 26) -- SP
+                        AND (ce.id_municipio IS NULL OR ce.id_municipio = r.id_municipio_vara) -- Dúvida #8: abrangência municipal (opção a)
                         AND dia::date BETWEEN make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia)
                             AND make_date(COALESCE(ce.dt_ano_final, ce.dt_ano),
                                           COALESCE(ce.dt_mes_final, ce.dt_mes),

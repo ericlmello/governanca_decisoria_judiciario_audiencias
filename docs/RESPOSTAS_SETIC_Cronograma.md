@@ -1,6 +1,6 @@
 # Respostas SETIC — Critérios de Audiências
 
-**Status:** Consolidando respostas do SETIC/Negócio às dúvidas levantadas em 2026-09-24 (11 dúvidas após revisão de 2026-09-28)
+**Status:** 9 de 11 dúvidas resolvidas/confirmadas pela SETIC (2026-09-30). Restam apenas 2 residuais de baixo risco.
 
 **Nota de numeração:** A partir de 2026-09-28, os números de dúvida usados neste arquivo foram
 alinhados aos do documento canônico `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (fonte de
@@ -135,58 +135,43 @@ seguida de Julgamento/Conciliação diretamente = **Efetiva**, por analogia com 
 
 ---
 
-## ⏳ Pendentes
-
 ### Dúvida #8: Dias Úteis — Abrangência Municipal
 
-Status: **Aguardando resposta**
+**Resposta (2026-09-30):** Opção **(a)** — apenas para varas daquele município (granulado).
 
-Se suspensão vale só em 1 município, deve contar como não-útil:
-- **(a) Apenas para varas daquele município** (granulado)
-- **(b) Nunca — estado inteiro** (simplificado)
-- **(c) Não entra no cálculo** (ignora município)
+**Implicação na query v2:** ✅ Implementado (CTE `calendario_3du`, filtro por `id_municipio_vara`)
 
-**Impacto:** Baixo (edge case)
+**Data da resposta:** 2026-09-30
 
 ---
 
 ### Dúvida #10: Watermark de Carga (`VAR_ULT_DT_AUDIENCIA`) Autorreferente
 
-Status: **Aguardando resposta**
+**Resposta (2026-09-30):** Manter como está — sem rolling window, sem config table. Risco de
+perda silenciosa aceito conscientemente.
 
-Confirmado pelo usuário que a variável vem de:
-```sql
-SELECT MAX(dt_audiencia) AS ultima_dt
-FROM pai_2_0.audiencias
-WHERE status <> 'Programada'
-```
+**Implicação na query v2:** Nenhuma mudança (já usava o watermark exato); propostas de mitigação
+em `sql/procedimentos_fase4b.sql` marcadas como "histórico — não implementar".
 
-Watermark lido da própria tabela de destino → risco de perda silenciosa de audiências
-cujas janelas de 3 dias úteis fecham depois de outras do mesmo dia (calendário varia por vara).
-
-Perguntas:
-1. É um padrão intencional/conhecido ou não documentado?
-2. Existe reprocessamento/backfill já em uso?
-3. Existe auditoria periódica que detectaria essa lacuna?
-
-**Impacto:** Alto (perda de dados sem alerta — não é regra de negócio, é mecanismo de carga)
+**Data da resposta:** 2026-09-30
 
 ---
 
-### Dúvida #11: [NOVA 2026-09-28] Mapeamento Exato do Tipo "Conciliação"
+### Dúvida #11: Mapeamento Exato do Tipo "Conciliação"
 
-Status: **Aguardando resposta**
+**Resposta (2026-09-30):** Confirmado — apenas Conciliação em Conhecimento (ids 1, 32, 20, 33).
+Conciliação em Execução não conta.
 
-O documento revisado (2026-09-28) introduziu "Conciliação" como sinal válido em 3 pontos
-(Inicial, UNA, Instrução) sem especificar qual subtipo — Conciliação em Conhecimento (ids 1, 32,
-20, 33) ou Conciliação em Execução (ids 2, 34, 36, 21, 35, 37).
+**Implicação na query v2:** ✅ Já implementado, hipótese confirmada (`parametros.tipo_conciliacao`)
 
-**Hipótese implementada:** apenas Conciliação em Conhecimento (fase compatível temporalmente com
-os demais tipos avaliados).
-
-**Impacto:** Médio (afeta 3 regras: Inicial/UNA/Instrução)
+**Data da resposta:** 2026-09-30
 
 ---
+
+## ⏳ Pendentes
+
+Nenhuma pendência formal restante — apenas os 2 residuais de baixo risco abaixo (hipótese já
+implementada, aguardando confirmação quando possível).
 
 ## Processo de Consolidação
 
@@ -205,7 +190,9 @@ os demais tipos avaliados).
 | 9 | RS = Rito Sumário | Encerrada, não aguarda SETIC | `audiencias_realizadas_v2_draft.sql:62,68–71` |
 | 2 | UNA → Julgamento/Conciliação direto fora da janela = Efetiva (regra geral) | Implementada; escopo reduzido em 28/09; **ainda enviada à SETIC** | `audiencias_realizadas_v2_draft.sql`, regra 3d do `CASE` |
 | 4 | Tipo 8 "Instrução e Julgamento" = sempre Efetiva | ✅ Confirmada pela SETIC (2026-09-29) | `audiencias_realizadas_v2_draft.sql`, regra 1.5 do `CASE` |
-| 11 | Conciliação = só "em Conhecimento" (ids 1,32,20,33) | Implementada; **NOVA pergunta enviada à SETIC** | `audiencias_realizadas_v2_draft.sql`, `parametros.tipo_conciliacao` |
+| 11 | Conciliação = só "em Conhecimento" (ids 1,32,20,33) | ✅ Confirmada pela SETIC (2026-09-30) | `audiencias_realizadas_v2_draft.sql`, `parametros.tipo_conciliacao` |
+| 8 | Abrangência municipal = granular (opção a) | ✅ Confirmada pela SETIC (2026-09-30) | `audiencias_realizadas_v2_draft.sql`, CTE `calendario_3du` |
+| 10 | Watermark mantido como está (sem rolling window) | ✅ Confirmada pela SETIC (2026-09-30) | Nenhuma mudança de código necessária |
 
 ---
 
@@ -217,16 +204,18 @@ os demais tipos avaliados).
 - [x] **Documento SETIC revisado recebido — Dúvidas #1, #5 resolvidas, #3 parcial** (2026-09-28)
 - [x] Implementar todas as mudanças de regra do documento revisado em `audiencias_realizadas_v2_draft.sql`
 - [x] **Dúvida #4 (tipo 8) confirmada pela SETIC** (2026-09-29)
-- [ ] Aguardar respostas (dúvidas #2 residual, #3 residual, #8, #10, #11)
+- [x] **Dúvidas #8, #10, #11 confirmadas pela SETIC** (2026-09-30) — todas implementadas
+- [ ] Aguardar confirmação dos 2 residuais de baixo risco (#2, #3) — não bloqueiam nada
 - [x] Atualizar este cronograma e `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` conforme respostas chegarem
 - [x] **FASE 3 (Testes):** Criar plano abrangente — `docs/PLANO_TESTES_FASE_3.md` (40+ casos de teste, bloqueadores identificados)
 - [x] **FASE 4 (Monitoramento):** Implementar tabelas `fato_audiencia_classificada`, `trilha_execucao`, `metrica_integridade` — `sql/tabelas_monitoramento_fase4.sql`
-- [ ] Finalizar `audiencias_realizadas_v2_draft.sql` com as respostas restantes de dúvidas críticas (#8, #10, #11)
-- [ ] Testes com dados reais (~100k audiências) — ativado após respostas SETIC
+- [x] Finalizar `audiencias_realizadas_v2_draft.sql` — todas as dúvidas críticas respondidas
+- [ ] Testes com dados reais (~100k audiências) — pode iniciar já
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-29 (Dúvida #4 confirmada pela SETIC — sempre Efetiva)
+**Última atualização:** 2026-09-30 (Dúvidas #8, #10, #11 confirmadas pela SETIC — nenhuma
+pendência formal restante, só 2 residuais de baixo risco)
 
-**Próxima revisão:** Quando dúvidas restantes (#2 residual, #3 residual, #8, #10, #11) forem respondidas
+**Próxima revisão:** Quando dúvidas residuais (#2, #3) forem respondidas, ou quando Fase 3 (testes) iniciar

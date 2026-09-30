@@ -307,7 +307,7 @@ Query v2 já implementa corretamente (nenhuma mudança necessária).
 
 ---
 
-## 8. Dias Úteis: Abrangência Municipal
+## 8. Dias Úteis: Abrangência Municipal — ✅ RESOLVIDA (2026-09-30)
 **Seção do documento:** 📑 Audiência de Instrução (linha 62–67) e tabela "Movimentos Monitorados" (linha 75)
 
 ### Contexto técnico:
@@ -329,8 +329,15 @@ Se um registro de `tb_calendario_eventos` suspender audiências **apenas em um m
 ### Pergunta:
 Qual é o escopo desejado?
 
+### ✅ Resposta (2026-09-30):
+**Opção (a)** — granular, vale só para as varas daquele município.
+
 ### Impacto técnico:
-Query v2 atual ignora `id_municipio` (opção c). Se a resposta for (a), precisará de revisão para filtrar por vara/órgão julgador.
+Implementado em `sql/audiencias_realizadas_v2_draft.sql` (CTE `calendario_3du`): adicionado
+`toj.id_municipio AS id_municipio_vara` em `audiencias_realizadas` e filtro
+`(ce.id_municipio IS NULL OR ce.id_municipio = r.id_municipio_vara)` no cálculo do 3º dia útil.
+TODO(confirmar schema): assume que `pje.tb_orgao_julgador` tem coluna `id_municipio` — ajustar
+nome se diferente.
 
 ---
 
@@ -359,7 +366,7 @@ Classificação de negócio confirmada, mapeamento de `tipo_una` já estava corr
 
 ---
 
-## 10. Watermark de Carga (`VAR_ULT_DT_AUDIENCIA`) É Autorreferente — Risco de Perda Silenciosa
+## 10. Watermark de Carga (`VAR_ULT_DT_AUDIENCIA`) É Autorreferente — Risco de Perda Silenciosa — ✅ RESOLVIDA (2026-09-30)
 **Seção do documento:** Não se aplica às regras de negócio — é sobre o mecanismo de carga incremental que alimenta a tabela `pai_2_0.audiencias`.
 
 ### Contexto:
@@ -387,12 +394,19 @@ Perda **silenciosa** de audiências — sem erro, sem log de falha, elas simples
 2. Existe algum mecanismo de reprocessamento/backfill já em uso para mitigar esse tipo de perda (ex.: reprocessar os últimos N dias a cada carga, upsert por chave)?
 3. Há alguma auditoria/reconciliação periódica que compare a população total de audiências elegíveis (`pje`) com o que foi de fato carregado em `pai_2_0.audiencias`, capaz de detectar esse tipo de lacuna?
 
+### ✅ Resposta (2026-09-30):
+**Manter o watermark exatamente como está** — sem rolling window, sem config table externa. O
+risco de perda silenciosa descrito acima é **aceito conscientemente**.
+
 ### Impacto técnico:
-Recomendação já adotada na v2 (aguardando confirmação do padrão de carga): trocar o corte exato por uma **sobra de segurança** (ex.: `MAX(dt_audiencia) - 45 dias`, não o valor exato) combinada com **upsert** na chave `(id_processo_audiencia, versao_regra)`, para que reprocessar um período já carregado apenas atualize (sem duplicar) e audiências "esquecidas" voltem a ser avaliadas em cargas futuras.
+`sql/audiencias_realizadas_v2_draft.sql` não foi alterado (já usava o watermark exato). As
+propostas de mitigação (Opção A: rolling window -45 dias; Opção B: config table) em
+`sql/procedimentos_fase4b.sql` foram marcadas como "histórico — não implementar", mantidas só
+como referência caso a decisão mude no futuro.
 
 ---
 
-## 11. [NOVA — 2026-09-28] Mapeamento Exato do Tipo "Conciliação"
+## 11. [NOVA — 2026-09-28] Mapeamento Exato do Tipo "Conciliação" — ✅ RESOLVIDA (2026-09-30)
 **Seção do documento:** 📋 Audiência Inicial, 🔵 Audiência UNA, 📑 Audiência de Instrução (documento revisado 2026-09-28)
 
 ### Contexto:
@@ -408,14 +422,13 @@ O documento não especifica QUAL subtipo de Conciliação é relevante. O catál
   Inicial/UNA/Instrução
 - **Conciliação em Execução** (ids 2, 34, 36, 21, 35, 37) — fase de execução, pós-julgamento
 
-### Hipótese de trabalho (implementada, não confirmada):
-Usamos apenas **Conciliação em Conhecimento** (1, 32, 20, 33). Conciliação em Execução ocorre
-temporalmente muito depois (fase de execução, após trânsito em julgado), incompatível com sinais
-restritos a poucos dias úteis após uma audiência de conhecimento.
-
 ### Pergunta:
 Confirma que "Conciliação", nos três contextos acima, se refere apenas à **Conciliação em
 Conhecimento**? Ou deveria incluir também Conciliação em Execução em algum desses contextos?
+
+### ✅ Resposta (2026-09-30):
+Confirmado — apenas **Conciliação em Conhecimento** (1, 32, 20, 33). Conciliação em Execução
+NÃO conta.
 
 ### Impacto técnico:
 Implementado em `sql/audiencias_realizadas_v2_draft.sql` (`parametros.tipo_conciliacao = ARRAY[1,
@@ -435,12 +448,12 @@ ao array.
 | 5 | Sentença terminativa × sentença de mérito | 81–84 | ✅ Resolvida (2026-09-28) — implementada, 27 códigos | — |
 | 6 | Perícia: avaliada quando? | 76 | ✅ Resolvida (2026-09-25) — implementada | — |
 | 7 | Inicial → "qualquer" audiência (literal ou restrito?) | 14–21 | ✅ Resolvida (2026-09-24) — implementada | — |
-| 8 | Dias úteis + abrangência municipal | 62–67 | Ignora município | **Baixo** (edge case) |
+| 8 | Dias úteis + abrangência municipal | 62–67 | ✅ Resolvida (2026-09-30) — opção (a), granular | — |
 | 9 | [Informativo] RS = Rito Sumário | Escopo | ✅ Resolvida (2026-09-24) — confirmado | — |
-| 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | Herda o padrão atual (`MAX(dt_audiencia)` exato) | **Alto** (perda de dados sem alerta) |
-| 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | Hipótese implementada (só Conciliação em Conhecimento) | **Médio** (afeta 3 regras: Inicial/UNA/Instrução) |
+| 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | ✅ Resolvida (2026-09-30) — mantido como está, risco aceito | — |
+| 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | ✅ Resolvida (2026-09-30) — só Conciliação em Conhecimento | — |
 
-**Pendentes reais (aguardando SETIC):** #8, #10, #11. **Residuais de baixo risco:** #2, #3.
+**Pendentes reais (aguardando SETIC):** nenhuma. **Residuais de baixo risco (hipótese já implementada):** #2, #3.
 
 ---
 

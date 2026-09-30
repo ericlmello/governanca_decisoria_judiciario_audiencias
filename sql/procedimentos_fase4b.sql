@@ -63,7 +63,8 @@ BEGIN
 
     BEGIN
         -- PASSO 1: Determinar watermark de entrada
-        -- NOTA: Implementação atual (autorreferente). Ver seção "Decisão SETIC #10" ao final
+        -- Autorreferente — mantido assim por decisão da SETIC (Dúvida #10, 2026-09-30, risco
+        -- de perda silenciosa aceito conscientemente). Ver seção "Decisão SETIC #10" ao final.
         SELECT MAX(dt_audiencia) INTO v_watermark_entrada
         FROM pai_2_0.audiencias
         WHERE status <> 'Programada';
@@ -182,7 +183,7 @@ BEGIN
         v_watermark_saida,
         v_duracao_ms,
         v_status,
-        45 -- Rolling window padrão (se SETIC confirmar Opção A)
+        NULL -- Rolling window NÃO implementado (SETIC decidiu manter watermark exato, Dúvida #10)
     );
 
     -- PASSO 4: Atualizar metrica_integridade
@@ -374,56 +375,27 @@ END;
 $$;
 
 -- ============================================================================
--- DECISÃO SETIC #10: Reprocessamento e Watermark
+-- DECISÃO SETIC #10: Reprocessamento e Watermark — RESOLVIDA (2026-09-30)
 -- ============================================================================
 /*
- * OPÇÃO A: Rolling Window (RECOMENDADO)
- * Implementação:
+ * SETIC decidiu MANTER o watermark exatamente como está hoje (autorreferente,
+ * SELECT MAX(dt_audiencia) exato, sem margem de segurança). As opções A (rolling window -45
+ * dias) e B (config table externa) abaixo foram propostas mas NÃO devem ser implementadas —
+ * mantidas aqui só como referência histórica, caso a decisão mude no futuro.
  *
- * 1. Modificar sp_executar_classificacao para usar:
- *    SELECT MAX(dt_audiencia) - INTERVAL '45 days' INTO v_watermark_entrada
- *    FROM pai_2_0.audiencias
- *    WHERE status <> 'Programada';
- *
- * 2. Sempre reprocessa últimos 45 dias (cobre 3DU + recesso)
- * 3. Detecta automaticamente lacunas (audiências não reprocessadas antes)
- * 4. UPSERT em fato_audiencia_classificada garante dedup por (id_processo_audiencia, versao_regra)
- *
- * Custo: +5-10% de I/O (reprocessa 45 dias toda execução)
- * Benefício: Seguro, detecta e corrige automaticamente
+ * Risco aceito conscientemente pela SETIC: perda silenciosa de audiências quando duas do mesmo
+ * dia têm janelas de 3 dias úteis diferentes (calendário varia por vara) — ver comentário em
+ * audiencias_realizadas_v2_draft.sql.
  *
  * ---
  *
- * OPÇÃO B: Marca d'Água Externa
- * Implementação:
+ * [HISTÓRICO — NÃO IMPLEMENTAR] OPÇÃO A: Rolling Window
+ *   SELECT MAX(dt_audiencia) - INTERVAL '45 days' INTO v_watermark_entrada ...
+ *   Sempre reprocessa últimos 45 dias; UPSERT garante dedup. Custo: +5-10% I/O.
  *
- * 1. Criar tabela config_watermark:
- *    CREATE TABLE pai_2_0.config_watermark (
- *      versao_regra TEXT PRIMARY KEY,
- *      dt_ultima_processada TIMESTAMP,
- *      dt_atualizado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
- *    );
- *
- * 2. Modificar sp_executar_classificacao para:
- *    SELECT dt_ultima_processada INTO v_watermark_entrada
- *    FROM pai_2_0.config_watermark
- *    WHERE versao_regra = p_versao_regra;
- *
- *    [executar query v2...]
- *
- *    UPDATE pai_2_0.config_watermark
- *    SET dt_ultima_processada = MAX(dt_audiencia_processada),
- *        dt_atualizado = CURRENT_TIMESTAMP
- *    WHERE versao_regra = p_versao_regra;
- *
- * Custo: Sem reprocessamento desnecessário (apenas > watermark)
- * Benefício: Explícito e auditável
- * Desvantagem: Requer sincronismo entre query e UPDATE
- *
- * ---
- *
- * TODO: Implementar Opção A como padrão (simples, segura)
- * Aguardar resposta SETIC para confirmar escolha
+ * [HISTÓRICO — NÃO IMPLEMENTAR] OPÇÃO B: Marca d'Água Externa
+ *   Tabela config_watermark separada, lida/atualizada a cada execução. Mais auditável, mas
+ *   requer schema change e sincronismo entre query e UPDATE.
  */
 
 -- ============================================================================
