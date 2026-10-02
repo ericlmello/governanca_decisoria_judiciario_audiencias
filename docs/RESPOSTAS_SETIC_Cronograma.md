@@ -1,6 +1,6 @@
 # Respostas SETIC — Critérios de Audiências
 
-**Status:** 9 de 11 dúvidas resolvidas/confirmadas pela SETIC (2026-09-30). Restam apenas 2 residuais de baixo risco.
+**Status:** 10 de 12 dúvidas resolvidas/confirmadas (2026-10-02). Resta a nova Dúvida #12 (alto impacto, 37,7% de UNA) e 1 residual de baixo risco (#2).
 
 **Nota de numeração:** A partir de 2026-09-28, os números de dúvida usados neste arquivo foram
 alinhados aos do documento canônico `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (fonte de
@@ -99,23 +99,23 @@ comentários atualizados de "hipótese" para "confirmado".
 
 ---
 
-## ⚠️ Parcialmente Resolvidas
-
 ### Dúvida #3: Instrução Sem Diligência e Sem Julgamento
 
-**Resposta parcial (documento revisado, 2026-09-28):** Nova regra explícita "sem diligência +
-Encerramento de Instrução designado → Adiada". Resolve o sub-caso de Encerramento de Instrução
-redesignado sem sinal de diligência.
+**Resposta (documento revisado, 2026-09-28):** Nova regra explícita "sem diligência + Encerramento
+de Instrução designado → Adiada". Resolve o sub-caso de Encerramento de Instrução redesignado sem
+sinal de diligência.
 
-**Resíduo ainda pendente:** Instrução sem NENHUM sinal registrado (nem diligência, nem
-Julgamento/Conciliação, nem Encerramento de Instrução designado) continua sem rótulo explícito no
-documento. Cai em Adiada por omissão — caso residual raro, ainda aguardando confirmação SETIC.
+**Resíduo (Instrução sem NENHUM sinal registrado) — resposta da área de negócio (2026-10-02):**
+Confirmado **Adiada**, validado também com dados reais (01/09–01/10/2026, 40.612 audiências sem
+duplicação). Nenhuma mudança de código necessária — já era o comportamento padrão.
 
 **Implicação na query v2:** ✅ Implementado (regra 4c do `CASE`, `audiencias_realizadas_v2_draft.sql`)
 
-**Data da resposta:** 2026-09-28 (parcial)
+**Data da resposta:** 2026-10-02 (resíduo); 2026-09-28 (regra principal)
 
 ---
+
+## ⚠️ Parcialmente Resolvidas
 
 ### Dúvida #2: UNA Seguida de Tipo Fora do Escopo
 
@@ -170,8 +170,26 @@ Conciliação em Execução não conta.
 
 ## ⏳ Pendentes
 
-Nenhuma pendência formal restante — apenas os 2 residuais de baixo risco abaixo (hipótese já
-implementada, aguardando confirmação quando possível).
+### Dúvida #12: [NOVA 2026-10-02] UNA Resolvida Diretamente, Sem Nova Audiência
+
+Status: **Aguardando resposta da área de negócio**
+
+UNA realizada, sem nova audiência designada, mas com sentença/acordo/julgamento registrado dentro
+de 3 dias úteis. Hoje nenhuma regra de UNA cobre esse caso — cai em Adiada por omissão.
+
+**Validação com dados reais (01/09–01/10/2026):** representa **37,7% de toda a população de UNA**
+(10.776 de 28.577) — maior volume entre todos os pontos já levantados neste projeto. Amostra de
+15 processos confirmou que os sinais correspondem a eventos reais dentro da janela.
+
+**Pergunta:** confirma Efetiva, por analogia com a regra já confirmada para a Inicial?
+
+**Impacto:** Alto (maior volume já identificado) — enviada à área de negócio em 2026-10-02 junto
+com o resíduo da Dúvida #3.
+
+---
+
+Fora isso, nenhuma pendência formal restante — apenas o residual de baixo risco abaixo (hipótese
+já implementada, aguardando confirmação quando possível).
 
 ## Processo de Consolidação
 
@@ -210,12 +228,14 @@ implementada, aguardando confirmação quando possível).
 - [x] **FASE 3 (Testes):** Criar plano abrangente — `docs/PLANO_TESTES_FASE_3.md` (40+ casos de teste, bloqueadores identificados)
 - [x] **FASE 4 (Monitoramento):** Implementar tabelas `fato_audiencia_classificada`, `trilha_execucao`, `metrica_integridade` — `sql/tabelas_monitoramento_fase4.sql`
 - [x] Finalizar `audiencias_realizadas_v2_draft.sql` — todas as dúvidas críticas respondidas
-- [ ] Testes com dados reais (~100k audiências) — pode iniciar já
+- [x] Testes com dados reais (01/09–01/10/2026, ~40.6k audiências) — iniciados, sem duplicação
+- [x] Dúvida #3 (resíduo) confirmada pela área de negócio — Adiada
+- [ ] **Dúvida #12 (NOVA, 2026-10-02):** UNA sem nova audiência = Efetiva? — maior achado da validação (37,7% de UNA)
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-09-30 (Dúvidas #8, #10, #11 confirmadas pela SETIC — nenhuma
-pendência formal restante, só 2 residuais de baixo risco)
+**Última atualização:** 2026-10-02 (validação com dados reais; Dúvida #3 confirmada; nova Dúvida
+#12 identificada e enviada à área de negócio — maior achado até agora)
 
-**Próxima revisão:** Quando dúvidas residuais (#2, #3) forem respondidas, ou quando Fase 3 (testes) iniciar
+**Próxima revisão:** Quando Dúvida #12 for respondida (prioritário) ou a #2 residual for confirmada

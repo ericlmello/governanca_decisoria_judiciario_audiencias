@@ -124,7 +124,7 @@ janela de 3 dias úteis e já é tratada pela regra 3b).
 
 ---
 
-## 3. Instrução Sem Diligência e Sem Julgamento — ⚠️ PARCIALMENTE RESOLVIDA (2026-09-28)
+## 3. Instrução Sem Diligência e Sem Julgamento — ✅ RESOLVIDA (2026-10-02)
 **Seção do documento:** 📑 Audiência de Instrução (linha 57–73)
 
 ### Regra atual:
@@ -149,20 +149,17 @@ designado" → ADIADA**. Isso confirma, para o sub-caso específico de "Encerram
 redesignado sem sinal de diligência", que o resultado é Adiada (mesma lógica de "bipartição
 injustificada" da UNA). Já implementado (`sql/audiencias_realizadas_v2_draft.sql`, regra 4c).
 
-**Resíduo ainda em aberto:** o documento não cobriu o caso de Instrução **sem NENHUM sinal
-registrado** — nem diligência, nem Julgamento/Conciliação designado, nem Encerramento de
-Instrução designado (isto é, nada acontece depois, nenhuma audiência nova é sequer marcada).
-Esse caso residual continua caindo em ADIADA por omissão (`ELSE` do `CASE`), sem confirmação
-explícita da SETIC.
+**Resíduo (Instrução sem NENHUM sinal registrado):** o documento não cobriu o caso de Instrução
+sem diligência, sem Julgamento/Conciliação designado e sem Encerramento de Instrução designado
+(nada acontece depois, nenhuma audiência nova é sequer marcada).
 
-### Pergunta remanescente:
-Instrução sem qualquer sinal subsequente (nem diligência, nem Julgamento/Conciliação/Encerramento
-de Instrução designado) — confirma **Adiada** por omissão, ou existe alguma regra de prazo/tempo
-adicional (ex.: aguardar X dias além dos 3 úteis antes de classificar)?
+### ✅ Resposta ao resíduo (área de negócio, 2026-10-02):
+Confirmado **Adiada** — validado também com dados reais (01/09–01/10/2026): já é o comportamento
+atual da query (`ELSE 'Adiada'` do `CASE`), nenhuma mudança de código necessária.
 
 ### Impacto técnico:
-Caso residual raro na prática (a maioria das Instruções tem algum movimento subsequente em até 3
-dias úteis). Query v2 classifica por omissão (ADIADA) — confirmar se é o esperado.
+Nenhuma mudança necessária — a implementação já estava correta por omissão, agora com confirmação
+formal da área de negócio.
 
 ---
 
@@ -437,13 +434,39 @@ ao array.
 
 ---
 
+## 12. [NOVA — 2026-10-02] UNA Resolvida Diretamente, Sem Nova Audiência
+**Seção do documento:** 🔵 Audiência UNA — mesma lacuna já identificada e resolvida para a Inicial (Dúvida #1), nunca endereçada para a UNA.
+
+### Contexto:
+A revisão de 28/09 acrescentou "ou ocorre a prolação da sentença" como gatilho de Efetiva para a
+Inicial quando não há nova audiência. A mesma situação pode ocorrer com a UNA: ela é realizada,
+nenhuma nova audiência é designada, mas há sentença/acordo/julgamento registrado dentro de 3 dias
+úteis. Hoje nenhuma regra de UNA cobre esse caso — cai em Adiada por omissão.
+
+### Validação com dados reais (01/09–01/10/2026):
+Esse cenário representa **37,7% de toda a população de UNA** (10.776 de 28.577 audiências) — o
+maior volume entre todos os pontos já levantados neste projeto. Amostra de 15 processos confirmou
+que os sinais de sentença/julgamento (`movimentos_julgamento`) correspondem a eventos reais dentro
+da janela de 3 dias úteis, sem nova audiência marcada.
+
+### Pergunta:
+Confirma que UNA resolvida direto por sentença/acordo/julgamento, sem nenhuma nova audiência
+designada, deve ser **Efetiva** — por analogia com a regra já confirmada para a Inicial?
+
+### Impacto técnico:
+Pendente de implementação — estender a condição da regra "sem diligência + Julgamento/Conciliação"
+(`sql/audiencias_realizadas_v2_draft.sql`, regra 3b) para também valer quando não há nenhuma
+próxima audiência (hoje exige `pa.id_tipo_audiencia_proxima = ANY(tipo_instrucao||tipo_encerramento_instrucao)`).
+
+---
+
 ## Anexo: Tabela de Referência Rápida
 
 | # | Assunto | Linha do Documento | Status na v2 | Risco |
 |---|---|---|---|---|
 | 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | ✅ Resolvida (2026-09-28) — implementada | — |
 | 2 | UNA → Julgamento/Conciliação direto fora da janela — **hipótese: Efetiva**, por confirmar (escopo reduzido em 28/09) | 26–55 | Adiada por omissão fora da janela | **Baixo** (residual, maioria já coberta pela janela) |
-| 3 | Instrução sem diligência e sem Julgamento | 57–73 | ⚠️ Parcialmente resolvida (2026-09-28) — resíduo: nenhum sinal registrado | **Baixo** (residual, caso raro) |
+| 3 | Instrução sem diligência e sem Julgamento | 57–73 | ✅ Resolvida (2026-10-02) — confirmado Adiada, validado com dados reais | — |
 | 4 | Tipo 8 "Instrução e Julgamento" — sempre Efetiva (exceto redesignação) | — | ✅ Resolvida (2026-09-29) — implementada | — |
 | 5 | Sentença terminativa × sentença de mérito | 81–84 | ✅ Resolvida (2026-09-28) — implementada, 27 códigos | — |
 | 6 | Perícia: avaliada quando? | 76 | ✅ Resolvida (2026-09-25) — implementada | — |
@@ -452,8 +475,9 @@ ao array.
 | 9 | [Informativo] RS = Rito Sumário | Escopo | ✅ Resolvida (2026-09-24) — confirmado | — |
 | 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | ✅ Resolvida (2026-09-30) — mantido como está, risco aceito | — |
 | 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | ✅ Resolvida (2026-09-30) — só Conciliação em Conhecimento | — |
+| 12 | [NOVA 2026-10-02] UNA resolvida direto, sem nova audiência | — | Aguardando área de negócio | **Alto** (37,7% da população UNA) |
 
-**Pendentes reais (aguardando SETIC):** nenhuma. **Residuais de baixo risco (hipótese já implementada):** #2, #3.
+**Pendente (aguardando área de negócio):** #12. **Residual de baixo risco (hipótese já implementada):** #2.
 
 ---
 
