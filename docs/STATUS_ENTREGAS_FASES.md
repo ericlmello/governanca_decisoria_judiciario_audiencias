@@ -66,7 +66,7 @@ hipótese implementada). Todas confirmadas e implementadas em
 ### Entregáveis
 - ✅ `sql/audiencias_realizadas_v2_draft.sql` (~630 linhas)
   - Implementação das 7 regras formalizadas
-  - 6 bugs corrigidos (comparação de categoria, Encerramento obrigatório, Julgamento tardio, calendário, busca limitada, buffer de 10 dias, tipo de dado)
+  - 7 bugs corrigidos (comparação de categoria, Encerramento obrigatório, Julgamento tardio, calendário, busca limitada, buffer de 10 dias, tipo de dado, feriado municipal recorrente sem ano — achado em validação 2026-10-02, 728 registros afetados)
   - ✅ Dúvidas #1, #5 resolvidas e implementadas (2026-09-28, documento SETIC revisado)
   - ✅ Dúvida #3 resolvida e implementada (confirmada 2026-10-02: Adiada)
   - ✅ Dúvida #6 (perícia) resolvida e implementada (2026-09-25)

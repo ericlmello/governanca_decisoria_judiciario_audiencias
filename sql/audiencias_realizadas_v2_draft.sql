@@ -224,8 +224,10 @@ sentenca_ou_acordo_sem_janela AS (
 -- intervalo inteiro, não só o dia inicial. Busca até 60 dias à frente para atravessar o recesso.
 -- in_ativo e in_suspende_prazo são do domínio pje."boleano" (tipo base não confirmado): o ::text
 -- funciona tanto se for boolean ('true') quanto char ('S').
--- TODO(confirmar): existem registros com dt_ano NULL (feriado fixo recorrente)? Se sim, hoje
--- eles são ignorados - rodar: SELECT COUNT(*) FROM pje.tb_calendario_eventos WHERE dt_ano IS NULL;
+-- Feriados fixos recorrentes (dt_ano IS NULL, ex.: aniversário do município) repetem todo ano -
+-- a data é remontada com o ANO do dia sendo testado, em vez de usar make_date(NULL, ...), que
+-- retornaria NULL e faria o BETWEEN falhar silenciosamente (728 registros confirmados com
+-- dt_ano IS NULL em 2026-10-02).
 calendario_3du AS (
     SELECT
         r.id_processo_audiencia,
@@ -247,10 +249,21 @@ calendario_3du AS (
                         AND (ce.id_orgao_julgador IS NULL OR ce.id_orgao_julgador = r.id_orgao_julgador)
                         AND (ce.id_estado IS NULL OR ce.id_estado = 26) -- SP
                         AND (ce.id_municipio IS NULL OR ce.id_municipio = r.id_municipio_vara)
-                        AND dia::date BETWEEN make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia)
-                            AND make_date(COALESCE(ce.dt_ano_final, ce.dt_ano),
-                                          COALESCE(ce.dt_mes_final, ce.dt_mes),
-                                          COALESCE(ce.dt_dia_final, ce.dt_dia))
+                        AND (
+                            (ce.dt_ano IS NOT NULL
+                             AND dia::date BETWEEN make_date(ce.dt_ano, ce.dt_mes, ce.dt_dia)
+                                 AND make_date(COALESCE(ce.dt_ano_final, ce.dt_ano),
+                                               COALESCE(ce.dt_mes_final, ce.dt_mes),
+                                               COALESCE(ce.dt_dia_final, ce.dt_dia))
+                            )
+                            OR
+                            (ce.dt_ano IS NULL
+                             AND dia::date BETWEEN make_date(EXTRACT(YEAR FROM dia)::int, ce.dt_mes, ce.dt_dia)
+                                 AND make_date(EXTRACT(YEAR FROM dia)::int,
+                                               COALESCE(ce.dt_mes_final, ce.dt_mes),
+                                               COALESCE(ce.dt_dia_final, ce.dt_dia))
+                            )
+                        )
                   )
             ) dias_uteis
             WHERE dias_uteis.rn = 3
