@@ -76,7 +76,7 @@ que Inicial → sentença/acordo homologado **diretamente**, sem nova audiência
 
 ---
 
-## 2. UNA Seguida de Tipo Fora do Documento — ⚠️ ESCOPO REDUZIDO (2026-09-28)
+## 2. UNA Seguida de Tipo Fora do Documento — ✅ RESOLVIDA (2026-10-02)
 **Seção do documento:** 🔵 Audiência UNA (linha 26–55)
 
 ### Regra atual:
@@ -117,10 +117,11 @@ estágio, não regrediu nem repetiu.
 analogia com a Inicial)?** Ou esse caso deveria ser tratado como Adiada por falta de regra
 explícita?
 
+### ✅ Resposta (área de negócio, 2026-10-02):
+Confirmado: **Efetiva**.
+
 ### Impacto técnico:
-Ramo "3d" do `CASE` (Efetiva por eliminação) — hoje é rede de segurança residual, de baixo
-impacto esperado (a maioria dos casos reais de Julgamento/Conciliação após UNA cai dentro da
-janela de 3 dias úteis e já é tratada pela regra 3b).
+Ramo "3d" do `CASE` (Efetiva por eliminação) — já implementado, sem alteração necessária.
 
 ---
 
@@ -472,7 +473,7 @@ Pendente de implementação — estender a condição da regra "sem diligência 
 (`sql/audiencias_realizadas_v2_draft.sql`, regra 3b) para também valer quando não há nenhuma
 próxima audiência (hoje exige `pa.id_tipo_audiencia_proxima = ANY(tipo_instrucao||tipo_encerramento_instrucao)`).
 
-## 13. [NOVA — 2026-10-02] Instrução Sem Regra de Avanço de Categoria (análogo à UNA, regra 3d)
+## 13. Instrução Sem Regra de Avanço de Categoria (análogo à UNA, regra 3d) — ✅ RESOLVIDA (2026-10-02)
 **Seção do documento:** 📑 Audiência de Instrução — lacuna estrutural, nunca endereçada (a UNA tem
 a regra 3d como rede de segurança; a Instrução não tem equivalente).
 
@@ -495,9 +496,13 @@ Confirma que ambos os cenários deveriam ser **Efetiva** — por analogia com a 
 (avançar de categoria = Efetiva) e com a lógica de "diligência cumprida" já aceita em outras
 regras?
 
+### ✅ Resposta (área de negócio, 2026-10-02):
+Confirmado: **Efetiva** para os dois cenários.
+
 ### Impacto técnico:
-Pendente — estender `sql/audiencias_realizadas_v2_draft.sql` com regras 4d (equivalente à 3d) e
-ajustar 4/4b para aceitar diligência+Julgamento sem Encerramento formal.
+✅ Implementado em `sql/audiencias_realizadas_v2_draft.sql` — nova regra 4a (diligência+Julgamento
+sem Encerramento formal) e nova regra 4d (Instrução seguida de qualquer outra audiência, análoga
+à 3d da UNA).
 
 ---
 
@@ -506,7 +511,7 @@ ajustar 4/4b para aceitar diligência+Julgamento sem Encerramento formal.
 | # | Assunto | Linha do Documento | Status na v2 | Risco |
 |---|---|---|---|---|
 | 1 | Inicial sem nova audiência (acordo/conclusão) | 14–22 | ✅ Resolvida (2026-09-28) — implementada | — |
-| 2 | UNA → Julgamento/Conciliação direto fora da janela — **hipótese: Efetiva**, por confirmar (escopo reduzido em 28/09) | 26–55 | Adiada por omissão fora da janela | **Baixo** (residual, maioria já coberta pela janela) |
+| 2 | UNA → Julgamento/Conciliação direto fora da janela | 26–55 | ✅ Resolvida (2026-10-02) — confirmado Efetiva | — |
 | 3 | Instrução sem diligência e sem Julgamento | 57–73 | ✅ Resolvida (2026-10-02) — confirmado Adiada, validado com dados reais | — |
 | 4 | Tipo 8 "Instrução e Julgamento" — sempre Efetiva (exceto redesignação) | — | ✅ Resolvida (2026-09-29) — implementada | — |
 | 5 | Sentença terminativa × sentença de mérito | 81–84 | ✅ Resolvida (2026-09-28) — implementada, 27 códigos | — |
@@ -516,10 +521,10 @@ ajustar 4/4b para aceitar diligência+Julgamento sem Encerramento formal.
 | 9 | [Informativo] RS = Rito Sumário | Escopo | ✅ Resolvida (2026-09-24) — confirmado | — |
 | 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | ✅ Resolvida (2026-09-30) — mantido como está, risco aceito | — |
 | 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | ✅ Resolvida (2026-09-30) — só Conciliação em Conhecimento | — |
-| 12 | [NOVA 2026-10-02] UNA resolvida direto, sem nova audiência | — | Aguardando área de negócio | **Alto** (37,7% da população UNA) |
-| 13 | [NOVA 2026-10-02] Instrução sem regra de avanço de categoria (análogo à UNA 3d) | — | Aguardando área de negócio | **Baixo** (54/40.581 = 0,13%) |
+| 12 | [NOVA 2026-10-02] UNA resolvida direto, sem nova audiência | — | Aguardando resposta (ver detalhamento abaixo) | **Alto** (37,7% da população UNA) |
+| 13 | Instrução sem regra de avanço de categoria (análogo à UNA 3d) | — | ✅ Resolvida (2026-10-02) — confirmado Efetiva | — |
 
-**Pendente (aguardando área de negócio):** #12, #13. **Residual de baixo risco (hipótese já implementada):** #2.
+**Pendente:** #12 (aguardando resposta detalhada, ver seção 12 abaixo — tem duas sub-perguntas).
 
 ---
 

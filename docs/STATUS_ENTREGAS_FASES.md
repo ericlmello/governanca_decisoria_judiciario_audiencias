@@ -1,18 +1,20 @@
 # Status de Entregas por Fase
 
 **Data de compilação:** 2026-09-25 (Atualizado 2026-10-02)  
-**Status geral:** Fase 2 em ~97% (10 de 13 dúvidas resolvidas; restam #12 alto impacto, #13 baixo impacto e #2 residual); Fase 3 pode iniciar; Fases 4–5 completas
+**Status geral:** Fase 2 em ~98% (12 de 13 dúvidas resolvidas; resta só #12, com duas sub-perguntas); Fase 3 pode iniciar; Fases 4–5 completas
 
 ---
 
-## ATUALIZAÇÃO 2026-10-02 — Dúvida #3 Confirmada; Novas Dúvidas #12 (Alto Impacto) e #13 (Baixo Impacto)
+## ATUALIZAÇÃO 2026-10-02 (final) — Dúvidas #2, #3, #13 Confirmadas; Só Resta #12
 
-Área de negócio confirmou Dúvida #3 (Instrução sem nenhum sinal registrado = Adiada), validado
-com 40.612 linhas sem duplicação. Durante a validação surgiram duas novas dúvidas: UNA resolvida
-diretamente (sentença/julgamento) sem nova audiência marcada — 37,7% de toda a população UNA
-(10.776 casos, Dúvida #12) — e Instrução sem regra de avanço de categoria análoga à UNA (regra
-3d), afetando 0,13% da população (54 casos, Dúvida #13). Ambas ainda não implementadas, aguardando
-confirmação da área de negócio (ver `docs/DUVIDAS_SETIC_Criterios_Audiencias.md`, seções 12-13).
+Área de negócio confirmou: Dúvida #3 (Instrução sem nenhum sinal registrado = Adiada, validado com
+40.612 linhas sem duplicação), Dúvida #2 (UNA → Julgamento/Conciliação fora da janela = Efetiva) e
+Dúvida #13 (Instrução sem regra de avanço de categoria análoga à UNA = Efetiva, 0,13% da
+população — implementação de código ainda pendente). Resta apenas a Dúvida #12 (UNA resolvida
+diretamente sem nova audiência, 37,7% de toda a população UNA), agora detalhada em duas
+sub-perguntas (caso principal de sentença/homologação, e o caso específico do código 473 —
+arquivamento por ausência do reclamante). Ver `docs/DUVIDAS_SETIC_Criterios_Audiencias.md`, seção
+12, para o detalhamento completo.
 
 ---
 
@@ -31,7 +33,7 @@ hipótese implementada). Todas confirmadas e implementadas em
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
 | 1 | Análise de regras | ✅ Completo | — | ✅ Concluído |
-| 2 | Query v2 + bugs | ⚠️ ~97% (faltam #12 e #13) | Resposta da área de negócio (#12, #13) | Implementar após confirmação |
+| 2 | Query v2 + bugs | ⚠️ ~98% (falta só #12) | Resposta da área de negócio (#12) + implementar regra 4d (#13) | Implementar após confirmação |
 | 3 | Testes ~100k | 📋 Pronto (40+ casos) | Acesso a banco de dados real | Pode iniciar já |
 | 4 | Monitoramento | ✅ 4a–4c completo | — | ✅ Pronto |
 | 5 | Produção | ✅ Guia pronto | Fase 3 OK + Dúvida #12 | Pronto; deploy após Fase 3 e #12 |
@@ -69,15 +71,15 @@ hipótese implementada). Todas confirmadas e implementadas em
   - ✅ Dúvidas #1, #5 resolvidas e implementadas (2026-09-28, documento SETIC revisado)
   - ✅ Dúvida #3 resolvida e implementada (confirmada 2026-10-02: Adiada)
   - ✅ Dúvida #6 (perícia) resolvida e implementada (2026-09-25)
-  - Regras para dúvida #2 implementada como hipótese (escopo reduzido em 28/09); dúvida #4 confirmada pela SETIC em 29/09
-  - Pendente: Dúvida #12 (nova, alto impacto — 37,7% da população UNA) e Dúvida #13 (nova, baixo impacto — 0,13%), ambas aguardando resposta da área de negócio
-  - TODOs/premissas remanescentes: dúvida #2 (residual de baixo risco), dúvida #12 (alto impacto) e dúvida #13 (baixo impacto), nenhuma implementada
+  - ✅ Dúvida #2 resolvida e implementada (confirmada 2026-10-02: Efetiva)
+  - ✅ Dúvida #13 confirmada e implementada (2026-10-02: Efetiva — regras 4a e 4d novas)
+  - TODOs/premissas remanescentes: só a Dúvida #12 (alto impacto, 2 sub-perguntas)
 
 ### Bloqueadores Críticos
 | Dúvida | Tópico | Status | Impacto | Prioridade |
 |--------|--------|--------|---------|-----------|
 | #1 | Inicial sem nova audiência (acordo/sentença) | ✅ Resolvida (2026-09-28) | — | ✅ IMPLEMENTADA |
-| #2 | UNA → Julgamento/Conciliação direto fora da janela | Aberta (escopo reduzido) | Baixo (residual) | Hipótese implementada |
+| #2 | UNA → Julgamento/Conciliação direto fora da janela | ✅ Resolvida (2026-10-02) | — | ✅ IMPLEMENTADA |
 | #3 | Instrução sem nenhum sinal (residual) | ✅ Resolvida (2026-10-02) | — | ✅ IMPLEMENTADA |
 | #4 | Tipo 8 "Instrução e Julgamento" | ✅ Resolvida (2026-09-29) | — | ✅ IMPLEMENTADA |
 | #5 | Sentença terminativa = "prolação"? | ✅ Resolvida (2026-09-28) | — | ✅ IMPLEMENTADA |
@@ -85,15 +87,14 @@ hipótese implementada). Todas confirmadas e implementadas em
 | #8 | Calendário: abrangência municipal? | ✅ Resolvida (2026-09-30) | — | ✅ IMPLEMENTADA |
 | #10 | Watermark autorreferente | ✅ Resolvida (2026-09-30) — mantido como está | — | ✅ IMPLEMENTADA |
 | #11 | Mapeamento exato de "Conciliação" | ✅ Resolvida (2026-09-30) | — | ✅ IMPLEMENTADA |
-| #12 | UNA resolvida sem nova audiência marcada (nova, 2026-10-02) | Aguardando área de negócio | **Alto (37,7% da população UNA)** | ⏳ NÃO IMPLEMENTADA |
-| #13 | Instrução sem regra de avanço de categoria (nova, 2026-10-02) | Aguardando área de negócio | **Baixo (0,13%)** | ⏳ NÃO IMPLEMENTADA |
+| #12 | UNA resolvida sem nova audiência marcada — 2 sub-perguntas (principal + código 473) | Aguardando área de negócio | **Alto (37,7% da população UNA)** | ⏳ NÃO IMPLEMENTADA |
+| #13 | Instrução sem regra de avanço de categoria | ✅ Resolvida (2026-10-02) | **Baixo (0,13%)** | ✅ IMPLEMENTADA |
 
 ### O que falta para finalizar Fase 2
-- [ ] Confirmação da área de negócio para Dúvida #12 (alto impacto) — **bloqueador atual**
-- [ ] Confirmação da área de negócio para Dúvida #13 (baixo impacto)
-- [ ] Implementar ajuste na regra 3b de UNA e 4d de Instrução em `sql/audiencias_realizadas_v2_draft.sql` após confirmação
-- [ ] Confirmação do residual de baixo risco #2 — não bloqueia nada
-- [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvidas #1, #3, #5, #6)
+- [ ] Confirmação da área de negócio para Dúvida #12 (alto impacto, 2 sub-perguntas) — **único item pendente**
+- [ ] Implementar ajuste na regra 3b de UNA após resposta da Dúvida #12
+- [x] Implementar regras 4a e 4d de Instrução (Dúvida #13, confirmada e implementada)
+- [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvidas #1, #2, #3, #5, #6, #13)
 
 ---
 
@@ -120,8 +121,8 @@ hipótese implementada). Todas confirmadas e implementadas em
 
 **Nota:** Dúvidas #1, #3, #5, #6 já foram respondidas e implementadas (ver
 `docs/DUVIDAS_SETIC_Criterios_Audiencias.md`) — Fase 3 não está mais bloqueada pela Fase 2.
-A nova Dúvida #12 (alto impacto) ainda não afeta o plano de testes em si, mas a query v2 deve
-ser reexecutada após sua implementação.
+A Dúvida #12 (alto impacto) ainda não afeta o plano de testes em si, mas a query v2 deve ser
+reexecutada após a implementação das regras pendentes (#12 e #13).
 
 ---
 
@@ -181,7 +182,7 @@ ser reexecutada após sua implementação.
 ## Fase 5: Produção ✅ (Pronto para Deploy)
 
 ### Requisitos
-- ⚠️ Fase 2 quase finalizada (10 de 13 dúvidas confirmadas; restam #12 alto impacto, #13 baixo impacto e #2 residual)
+- ⚠️ Fase 2 quase finalizada (12 de 13 dúvidas confirmadas; resta só #12, alto impacto)
 - ⏳ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
 - ✅ Fase 4a–4c operacional (monitoramento em funcionamento)
 
@@ -212,15 +213,15 @@ Responder formalmente a dúvidas:
 - [x] #6: Perícia ativa avaliada quando? **→ Opção (c) Marcada na janela (2026-09-25)**
 - [x] #5: Sentença terminativa conta como "prolação de sentença"? **→ SIM, respondido 2026-09-28**
 - [x] #3: Instrução sem NENHUM sinal (nem diligência, nem Julgamento/Encerramento) → **Adiada, confirmado 2026-10-02**
-- [ ] #2 (residual, baixo risco): UNA → Julgamento/Conciliação direto fora da janela → Efetiva, confirmar?
+- [x] #2: UNA → Julgamento/Conciliação direto fora da janela → **Efetiva, confirmado 2026-10-02**
 - [x] #4: Tipo 8 "Instrução e Julgamento" → **sempre Efetiva, confirmado 2026-09-29**
 - [x] #8: Calendário suspensão municipal → **Opção (a) granular, confirmado 2026-09-30**
 - [x] #10: Watermark autorreferente → **manter como está, risco aceito, confirmado 2026-09-30**
 - [x] #11: Conciliação → **só em Conhecimento, confirmado 2026-09-30**
-- [ ] #12 (nova, 2026-10-02, alto impacto): UNA resolvida por sentença/julgamento sem nova audiência marcada (37,7% da população UNA) → Efetiva, confirmar?
-- [ ] #13 (nova, 2026-10-02, baixo impacto): Instrução sem regra de avanço de categoria análoga à UNA (0,13% da população) → Efetiva, confirmar?
+- [x] #13: Instrução sem regra de avanço de categoria análoga à UNA → **Efetiva, confirmado e implementado 2026-10-02**
+- [ ] #12 (alto impacto, 2 sub-perguntas): UNA resolvida por sentença/julgamento sem nova audiência marcada (37,7% da população UNA) → caso principal e caso específico do código 473 (arquivamento por ausência do reclamante)
 
-Bloqueadores formais restantes: #12 (alto impacto) e #13 (baixo impacto). #2 é residual de baixo risco (hipótese já implementada).
+Bloqueador formal restante: só a Dúvida #12 (alto impacto, aguardando resposta a duas sub-perguntas).
 
 ### O que pode acontecer em PARALELO (não aguarda SETIC)
 - [x] Fase 3: Plano de testes estruturado (pronto para executar quando respostas chegarem)
@@ -265,7 +266,7 @@ Bloqueadores formais restantes: #12 (alto impacto) e #13 (baixo impacto). #2 é 
 - `docs/analisa_criterios_audiencias_setic.md` — Análise completa com bugs encontrados
 
 **Documentação de Dúvidas:**
-- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 13 dúvidas estruturadas (10 resolvidas; #2, #12 e #13 pendentes)
+- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 13 dúvidas estruturadas (12 resolvidas; só #12 pendente, com 2 sub-perguntas)
 
 **Implementação:**
 - `sql/audiencias_realizadas_v2_draft.sql` — Query v2 (Fase 2)
@@ -278,5 +279,5 @@ Bloqueadores formais restantes: #12 (alto impacto) e #13 (baixo impacto). #2 é 
 
 ---
 
-**Última atualização:** 2026-10-02 (dúvida #3 confirmada — Adiada; novas dúvidas #12 e #13 abertas — 10 de 13 resolvidas)  
-**Próxima revisão:** Quando a área de negócio responder às Dúvidas #12/#13, ou quando Fase 3 (testes) for executada
+**Última atualização:** 2026-10-02 (dúvidas #2, #3 e #13 confirmadas — 12 de 13 resolvidas; só resta #12, agora com 2 sub-perguntas detalhadas)  
+**Próxima revisão:** Quando a área de negócio responder à Dúvida #12, ou quando Fase 3 (testes) for executada

@@ -21,17 +21,20 @@
  *        d) UNA seguida de qualquer outro tipo avaliado (ex.: Julgamento ou Conciliação direto,
  *           fora da janela de 3 dias úteis) -> EFETIVA, por analogia com a regra da Inicial
  *   4. Instrução: diligência E Encerramento de Instrução -> EFETIVA;
+ *      diligência E Julgamento OU Conciliação (mesmo sem Encerramento formal) -> EFETIVA;
  *      sem diligência + Julgamento OU Conciliação -> EFETIVA;
  *      sem diligência + Encerramento de Instrução designado -> ADIADA;
- *      sem nenhum sinal subsequente -> ADIADA.
+ *      seguida de qualquer outro tipo avaliado (ex.: fora da janela de 3 dias úteis) -> EFETIVA,
+ *      por analogia com a regra da Inicial e da UNA (regra 7);
+ *      sem nenhum sinal subsequente e sem nenhuma próxima audiência -> ADIADA.
  *   5. Perícia ativa (laudo em aberto, prazo válido) conta como diligência se MARCADA dentro da
  *      janela de 3 dias úteis, independente de status ou prazo posterior. Perícia com prazo
  *      vencido não é tratada aqui (regra pertence ao painel de perícias do PAI, fora de escopo).
  *   6. Tipo 8 "Instrução e Julgamento": regra própria, sempre EFETIVA (exceto redesignação de
  *      mesma categoria, regra 1) - julgamento ocorre no mesmo ato, não depende de sinal
  *      posterior como a Instrução comum.
- *   7. UNA seguida de tipo que não é UNA nem Instrução/Encerramento de Instrução (ex.: Julgamento
- *      ou Conciliação direto) -> EFETIVA, por analogia com a regra da Inicial.
+ *   7. UNA ou Instrução seguida de tipo que não é a mesma categoria nem a bipartição esperada
+ *      (ex.: Julgamento ou Conciliação direto) -> EFETIVA, por analogia com a regra da Inicial.
  *
  * Mapeamento de pje.tb_tipo_audiencia (36 tipos cadastrados):
  *   Inicial ..................... 3, 16 (sumaríssimo), 22 (videoconf), 29 (videoconf sumaríssimo)
@@ -460,6 +463,12 @@ classificacao AS (
                  AND md.id_processo_audiencia IS NOT NULL
                  AND enc.id_processo_audiencia IS NOT NULL
                 THEN 'Efetiva'
+            -- 4a) diligência E Julgamento/Conciliação designado, mesmo SEM Encerramento de
+            --     Instrução formal - diligência cumprida e processo já avançou para julgamento.
+            WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
+                 AND md.id_processo_audiencia IS NOT NULL
+                 AND mj.id_processo_audiencia IS NOT NULL
+                THEN 'Efetiva'
             -- 4b) sem diligência + Julgamento OU Conciliação designado -> Efetiva.
             WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
                  AND md.id_processo_audiencia IS NULL
@@ -473,8 +482,15 @@ classificacao AS (
                  AND enc.id_processo_audiencia IS NOT NULL
                 THEN 'Adiada'
 
-            -- Instrução sem diligência, sem Julgamento/Conciliação designado e sem Encerramento
-            -- de Instrução designado - nenhum sinal registrado. Cai aqui por omissão (Adiada).
+            -- 4d) Instrução seguida de qualquer OUTRA audiência marcada (mesmo fora da janela de
+            --     3 dias úteis, sem nenhum outro sinal dentro dela) - Efetiva, por analogia com a
+            --     regra 3d da UNA.
+            WHEN r.id_tipo_audiencia = ANY (p.tipo_instrucao)
+                 AND pa.id_tipo_audiencia_proxima IS NOT NULL THEN 'Efetiva'
+
+            -- Instrução sem diligência, sem Julgamento/Conciliação designado, sem Encerramento
+            -- de Instrução designado e sem nenhuma próxima audiência - nenhum sinal registrado.
+            -- Cai aqui por omissão (Adiada).
             ELSE 'Adiada'
         END AS status
     FROM audiencias_realizadas r
