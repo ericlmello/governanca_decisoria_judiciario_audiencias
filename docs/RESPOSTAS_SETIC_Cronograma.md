@@ -188,6 +188,10 @@ de 3 dias úteis. Hoje nenhuma regra de UNA cobre esse caso — cai em Adiada po
 **Ressalva específica:** o código 473 é extinção por ausência da parte, não julgamento de mérito —
 vale confirmar separadamente se também conta como Efetiva ou se merece tratamento distinto.
 
+**Segunda verificação (6 casos de UNA sem nenhuma próxima audiência):** 100% tinham sinal real de
+encerramento — 5 com homologação de transação (466), 1 com arquivamento por ausência do
+reclamante (473). Nenhum caso "sem sinal nenhum" apareceu nessa sub-amostra.
+
 **Impacto:** Alto (maior volume já identificado) — enviada à área de negócio em 2026-10-02 junto
 com o resíduo da Dúvida #3.
 

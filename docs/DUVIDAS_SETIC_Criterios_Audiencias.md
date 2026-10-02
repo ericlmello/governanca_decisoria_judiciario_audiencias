@@ -451,6 +451,13 @@ da janela de 3 dias úteis, sem nova audiência marcada. Os eventos encontrados 
 466 "Homologada a transação" (6 casos), código 51 "Conclusos para julgamento/sentença" (5 casos) e
 código 473 "Arquivado o processo por ausência do reclamante" (4 casos).
 
+Segunda rodada de verificação, direcionada aos 6 casos de UNA sem nenhuma próxima audiência (uma
+sub-amostra de query de validação v2): **100% tinham sinal real de encerramento dentro da
+janela** — 5 com homologação de transação (código 466) e 1 com arquivamento por ausência do
+reclamante (código 473, seguido do evento 246 "Arquivados os autos definitivamente", que só
+formaliza a decisão já tomada pelo 473). Nenhum caiu no cenário "nada aconteceu" - reforça que a
+lacuna é sistemática, não uma hipótese rara.
+
 ### Pergunta:
 Confirma que UNA resolvida direto por sentença/acordo/julgamento, sem nenhuma nova audiência
 designada, deve ser **Efetiva** — por analogia com a regra já confirmada para a Inicial?
