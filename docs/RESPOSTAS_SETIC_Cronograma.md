@@ -179,9 +179,14 @@ de 3 dias úteis. Hoje nenhuma regra de UNA cobre esse caso — cai em Adiada po
 
 **Validação com dados reais (01/09–01/10/2026):** representa **37,7% de toda a população de UNA**
 (10.776 de 28.577) — maior volume entre todos os pontos já levantados neste projeto. Amostra de
-15 processos confirmou que os sinais correspondem a eventos reais dentro da janela.
+15 processos confirmou que os sinais correspondem a eventos reais dentro da janela: código 466
+"Homologada a transação" (6), código 51 "Conclusos para julgamento/sentença" (5) e código 473
+"Arquivado por ausência do reclamante" (4).
 
 **Pergunta:** confirma Efetiva, por analogia com a regra já confirmada para a Inicial?
+
+**Ressalva específica:** o código 473 é extinção por ausência da parte, não julgamento de mérito —
+vale confirmar separadamente se também conta como Efetiva ou se merece tratamento distinto.
 
 **Impacto:** Alto (maior volume já identificado) — enviada à área de negócio em 2026-10-02 junto
 com o resíduo da Dúvida #3.

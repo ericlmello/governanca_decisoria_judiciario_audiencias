@@ -447,11 +447,18 @@ nenhuma nova audiência é designada, mas há sentença/acordo/julgamento regist
 Esse cenário representa **37,7% de toda a população de UNA** (10.776 de 28.577 audiências) — o
 maior volume entre todos os pontos já levantados neste projeto. Amostra de 15 processos confirmou
 que os sinais de sentença/julgamento (`movimentos_julgamento`) correspondem a eventos reais dentro
-da janela de 3 dias úteis, sem nova audiência marcada.
+da janela de 3 dias úteis, sem nova audiência marcada. Os eventos encontrados na amostra: código
+466 "Homologada a transação" (6 casos), código 51 "Conclusos para julgamento/sentença" (5 casos) e
+código 473 "Arquivado o processo por ausência do reclamante" (4 casos).
 
 ### Pergunta:
 Confirma que UNA resolvida direto por sentença/acordo/julgamento, sem nenhuma nova audiência
 designada, deve ser **Efetiva** — por analogia com a regra já confirmada para a Inicial?
+
+**Ressalva específica sobre o código 473 (arquivamento por ausência do reclamante):** diferente
+de sentença ou homologação de acordo, esse evento é a extinção do processo por falta da parte, não
+um julgamento de mérito. Vale confirmar separadamente se esse caso também deve ser classificado
+como Efetiva (a audiência UNA se cumpriu e o processo terminou), ou se merece tratamento distinto.
 
 ### Impacto técnico:
 Pendente de implementação — estender a condição da regra "sem diligência + Julgamento/Conciliação"
