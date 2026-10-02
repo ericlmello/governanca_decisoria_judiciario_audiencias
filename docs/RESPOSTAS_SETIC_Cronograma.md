@@ -1,6 +1,6 @@
 # Respostas SETIC — Critérios de Audiências
 
-**Status:** 10 de 12 dúvidas resolvidas/confirmadas (2026-10-02). Resta a nova Dúvida #12 (alto impacto, 37,7% de UNA) e 1 residual de baixo risco (#2).
+**Status:** 10 de 13 dúvidas resolvidas/confirmadas (2026-10-02). Restam a nova Dúvida #12 (alto impacto, 37,7% de UNA), a nova Dúvida #13 (baixo impacto, lacuna estrutural da Instrução) e 1 residual de baixo risco (#2).
 
 **Nota de numeração:** A partir de 2026-09-28, os números de dúvida usados neste arquivo foram
 alinhados aos do documento canônico `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` (fonte de
@@ -197,6 +197,26 @@ com o resíduo da Dúvida #3.
 
 ---
 
+### Dúvida #13: [NOVA 2026-10-02] Instrução Sem Regra de Avanço de Categoria
+
+Status: **Aguardando resposta da área de negócio**
+
+A UNA tem a regra 3d como rede de segurança ("avançar de categoria = Efetiva", mesmo fora da
+janela). A Instrução não tem equivalente: (1) seguida de outra audiência fora da janela, sem
+sinal dentro dela, cai em Adiada por omissão; (2) diligência cumprida + Julgamento/Conciliação
+marcado dentro da janela, mas sem Encerramento de Instrução formal, também cai em Adiada por não
+se encaixar em nenhuma regra.
+
+**Validação com dados reais (01/09–01/10/2026):** cenário 1 = 47 casos, cenário 2 = 7 casos
+(0,13% da população avaliada, 40.581 audiências) — baixo volume, mas é a mesma lacuna estrutural
+da Dúvida #2, nunca perguntada para a Instrução.
+
+**Pergunta:** confirma Efetiva para os dois cenários, por analogia com a regra 3d da UNA?
+
+**Impacto:** Baixo (0,13%) — enviada à área de negócio em 2026-10-02.
+
+---
+
 Fora isso, nenhuma pendência formal restante — apenas o residual de baixo risco abaixo (hipótese
 já implementada, aguardando confirmação quando possível).
 
@@ -240,11 +260,12 @@ já implementada, aguardando confirmação quando possível).
 - [x] Testes com dados reais (01/09–01/10/2026, ~40.6k audiências) — iniciados, sem duplicação
 - [x] Dúvida #3 (resíduo) confirmada pela área de negócio — Adiada
 - [ ] **Dúvida #12 (NOVA, 2026-10-02):** UNA sem nova audiência = Efetiva? — maior achado da validação (37,7% de UNA)
+- [ ] **Dúvida #13 (NOVA, 2026-10-02):** Instrução sem regra de avanço de categoria = Efetiva? — baixo impacto (0,13%)
 - [ ] Colocar em produção com suporte e runbooks
 
 ---
 
-**Última atualização:** 2026-10-02 (validação com dados reais; Dúvida #3 confirmada; nova Dúvida
-#12 identificada e enviada à área de negócio — maior achado até agora)
+**Última atualização:** 2026-10-02 (validação com dados reais; Dúvida #3 confirmada; novas Dúvidas
+#12 e #13 identificadas e enviadas à área de negócio)
 
-**Próxima revisão:** Quando Dúvida #12 for respondida (prioritário) ou a #2 residual for confirmada
+**Próxima revisão:** Quando Dúvida #12 for respondida (prioritário), seguida de #13 e da #2 residual

@@ -1,19 +1,18 @@
 # Status de Entregas por Fase
 
 **Data de compilação:** 2026-09-25 (Atualizado 2026-10-02)  
-**Status geral:** Fase 2 em ~98% (10 de 12 dúvidas resolvidas; resta #12 de alto impacto e #2 residual de baixo risco); Fase 3 pode iniciar; Fases 4–5 completas
+**Status geral:** Fase 2 em ~97% (10 de 13 dúvidas resolvidas; restam #12 alto impacto, #13 baixo impacto e #2 residual); Fase 3 pode iniciar; Fases 4–5 completas
 
 ---
 
-## ATUALIZAÇÃO 2026-10-02 — Dúvida #3 Confirmada; Nova Dúvida #12 (Alto Impacto)
+## ATUALIZAÇÃO 2026-10-02 — Dúvida #3 Confirmada; Novas Dúvidas #12 (Alto Impacto) e #13 (Baixo Impacto)
 
 Área de negócio confirmou Dúvida #3 (Instrução sem nenhum sinal registrado = Adiada), validado
-com 40.612 linhas sem duplicação. Durante a validação surgiu uma nova dúvida de alto impacto:
-UNA resolvida diretamente (sentença/julgamento) sem nova audiência marcada — 37,7% de toda a
-população UNA (10.776 casos) — ainda não classificada como Efetiva pela regra atual, pois as
-regras de UNA exigem `pa.id_tipo_audiencia_proxima IS NOT NULL`. Aguardando confirmação da área
-de negócio (ver `docs/DUVIDAS_SETIC_Criterios_Audiencias.md`, seção 12) antes de implementar o
-ajuste em `sql/audiencias_realizadas_v2_draft.sql`.
+com 40.612 linhas sem duplicação. Durante a validação surgiram duas novas dúvidas: UNA resolvida
+diretamente (sentença/julgamento) sem nova audiência marcada — 37,7% de toda a população UNA
+(10.776 casos, Dúvida #12) — e Instrução sem regra de avanço de categoria análoga à UNA (regra
+3d), afetando 0,13% da população (54 casos, Dúvida #13). Ambas ainda não implementadas, aguardando
+confirmação da área de negócio (ver `docs/DUVIDAS_SETIC_Criterios_Audiencias.md`, seções 12-13).
 
 ---
 
@@ -32,7 +31,7 @@ hipótese implementada). Todas confirmadas e implementadas em
 | Fase | Objetivo | Status | Bloqueador | Próximo |
 |------|----------|--------|-----------|--------|
 | 1 | Análise de regras | ✅ Completo | — | ✅ Concluído |
-| 2 | Query v2 + bugs | ⚠️ ~98% (falta #12, alto impacto) | Resposta da área de negócio (#12) | Implementar após confirmação |
+| 2 | Query v2 + bugs | ⚠️ ~97% (faltam #12 e #13) | Resposta da área de negócio (#12, #13) | Implementar após confirmação |
 | 3 | Testes ~100k | 📋 Pronto (40+ casos) | Acesso a banco de dados real | Pode iniciar já |
 | 4 | Monitoramento | ✅ 4a–4c completo | — | ✅ Pronto |
 | 5 | Produção | ✅ Guia pronto | Fase 3 OK + Dúvida #12 | Pronto; deploy após Fase 3 e #12 |
@@ -71,8 +70,8 @@ hipótese implementada). Todas confirmadas e implementadas em
   - ✅ Dúvida #3 resolvida e implementada (confirmada 2026-10-02: Adiada)
   - ✅ Dúvida #6 (perícia) resolvida e implementada (2026-09-25)
   - Regras para dúvida #2 implementada como hipótese (escopo reduzido em 28/09); dúvida #4 confirmada pela SETIC em 29/09
-  - Pendente: Dúvida #12 (nova, 2026-10-02, alto impacto — 37,7% da população UNA) aguardando resposta da área de negócio
-  - TODOs/premissas remanescentes: dúvida #2 (residual de baixo risco) e dúvida #12 (alto impacto, não implementada)
+  - Pendente: Dúvida #12 (nova, alto impacto — 37,7% da população UNA) e Dúvida #13 (nova, baixo impacto — 0,13%), ambas aguardando resposta da área de negócio
+  - TODOs/premissas remanescentes: dúvida #2 (residual de baixo risco), dúvida #12 (alto impacto) e dúvida #13 (baixo impacto), nenhuma implementada
 
 ### Bloqueadores Críticos
 | Dúvida | Tópico | Status | Impacto | Prioridade |
@@ -87,10 +86,12 @@ hipótese implementada). Todas confirmadas e implementadas em
 | #10 | Watermark autorreferente | ✅ Resolvida (2026-09-30) — mantido como está | — | ✅ IMPLEMENTADA |
 | #11 | Mapeamento exato de "Conciliação" | ✅ Resolvida (2026-09-30) | — | ✅ IMPLEMENTADA |
 | #12 | UNA resolvida sem nova audiência marcada (nova, 2026-10-02) | Aguardando área de negócio | **Alto (37,7% da população UNA)** | ⏳ NÃO IMPLEMENTADA |
+| #13 | Instrução sem regra de avanço de categoria (nova, 2026-10-02) | Aguardando área de negócio | **Baixo (0,13%)** | ⏳ NÃO IMPLEMENTADA |
 
 ### O que falta para finalizar Fase 2
 - [ ] Confirmação da área de negócio para Dúvida #12 (alto impacto) — **bloqueador atual**
-- [ ] Implementar ajuste na regra 3b de UNA em `sql/audiencias_realizadas_v2_draft.sql` após confirmação
+- [ ] Confirmação da área de negócio para Dúvida #13 (baixo impacto)
+- [ ] Implementar ajuste na regra 3b de UNA e 4d de Instrução em `sql/audiencias_realizadas_v2_draft.sql` após confirmação
 - [ ] Confirmação do residual de baixo risco #2 — não bloqueia nada
 - [x] Remover TODOs / Marcar como Resolvido no RESPOSTAS_SETIC_Cronograma.md (Dúvidas #1, #3, #5, #6)
 
@@ -180,7 +181,7 @@ ser reexecutada após sua implementação.
 ## Fase 5: Produção ✅ (Pronto para Deploy)
 
 ### Requisitos
-- ⚠️ Fase 2 quase finalizada (10 de 12 dúvidas confirmadas; resta #12 de alto impacto e #2 residual)
+- ⚠️ Fase 2 quase finalizada (10 de 13 dúvidas confirmadas; restam #12 alto impacto, #13 baixo impacto e #2 residual)
 - ⏳ Fase 3 aprovada (testes OK, sem regressões bloqueantes)
 - ✅ Fase 4a–4c operacional (monitoramento em funcionamento)
 
@@ -217,8 +218,9 @@ Responder formalmente a dúvidas:
 - [x] #10: Watermark autorreferente → **manter como está, risco aceito, confirmado 2026-09-30**
 - [x] #11: Conciliação → **só em Conhecimento, confirmado 2026-09-30**
 - [ ] #12 (nova, 2026-10-02, alto impacto): UNA resolvida por sentença/julgamento sem nova audiência marcada (37,7% da população UNA) → Efetiva, confirmar?
+- [ ] #13 (nova, 2026-10-02, baixo impacto): Instrução sem regra de avanço de categoria análoga à UNA (0,13% da população) → Efetiva, confirmar?
 
-Bloqueador formal restante: #12 (alto impacto). #2 é residual de baixo risco (hipótese já implementada).
+Bloqueadores formais restantes: #12 (alto impacto) e #13 (baixo impacto). #2 é residual de baixo risco (hipótese já implementada).
 
 ### O que pode acontecer em PARALELO (não aguarda SETIC)
 - [x] Fase 3: Plano de testes estruturado (pronto para executar quando respostas chegarem)
@@ -263,7 +265,7 @@ Bloqueador formal restante: #12 (alto impacto). #2 é residual de baixo risco (h
 - `docs/analisa_criterios_audiencias_setic.md` — Análise completa com bugs encontrados
 
 **Documentação de Dúvidas:**
-- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 12 dúvidas estruturadas (10 resolvidas; #2 e #12 pendentes)
+- `docs/DUVIDAS_SETIC_Criterios_Audiencias.md` — 13 dúvidas estruturadas (10 resolvidas; #2, #12 e #13 pendentes)
 
 **Implementação:**
 - `sql/audiencias_realizadas_v2_draft.sql` — Query v2 (Fase 2)
@@ -276,5 +278,5 @@ Bloqueador formal restante: #12 (alto impacto). #2 é residual de baixo risco (h
 
 ---
 
-**Última atualização:** 2026-10-02 (dúvida #3 confirmada — Adiada; nova dúvida #12 de alto impacto aberta — 10 de 12 resolvidas)  
-**Próxima revisão:** Quando a área de negócio responder a Dúvida #12, ou quando Fase 3 (testes) for executada
+**Última atualização:** 2026-10-02 (dúvida #3 confirmada — Adiada; novas dúvidas #12 e #13 abertas — 10 de 13 resolvidas)  
+**Próxima revisão:** Quando a área de negócio responder às Dúvidas #12/#13, ou quando Fase 3 (testes) for executada

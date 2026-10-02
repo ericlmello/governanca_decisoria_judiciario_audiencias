@@ -472,6 +472,33 @@ Pendente de implementação — estender a condição da regra "sem diligência 
 (`sql/audiencias_realizadas_v2_draft.sql`, regra 3b) para também valer quando não há nenhuma
 próxima audiência (hoje exige `pa.id_tipo_audiencia_proxima = ANY(tipo_instrucao||tipo_encerramento_instrucao)`).
 
+## 13. [NOVA — 2026-10-02] Instrução Sem Regra de Avanço de Categoria (análogo à UNA, regra 3d)
+**Seção do documento:** 📑 Audiência de Instrução — lacuna estrutural, nunca endereçada (a UNA tem
+a regra 3d como rede de segurança; a Instrução não tem equivalente).
+
+### Contexto:
+Dois cenários da Instrução caem em Adiada por omissão (nenhuma regra explícita cobre):
+1. Instrução seguida de outra audiência marcada **fora da janela** de 3 dias úteis (ex.: Julgamento/
+   Conciliação tardio) — sem sinal dentro da janela, cai no `ELSE 'Adiada'` final, mesmo havendo
+   avanço real de estágio processual.
+2. Diligência cumprida **E** Julgamento/Conciliação marcado dentro da janela, mas **sem**
+   Encerramento de Instrução formal designado — não se encaixa nem na regra 4 (exige Encerramento)
+   nem na 4b (exige ausência de diligência).
+
+### Validação com dados reais (01/09–01/10/2026):
+Cenário 1: **47 casos** (0,12% da população avaliada, 40.581 audiências). Cenário 2: **7 casos**
+(0,02%). Impacto baixo em volume, mas é a mesma lacuna estrutural identificada para a UNA
+(Dúvida #2), nunca perguntada para a Instrução.
+
+### Pergunta:
+Confirma que ambos os cenários deveriam ser **Efetiva** — por analogia com a regra 3d da UNA
+(avançar de categoria = Efetiva) e com a lógica de "diligência cumprida" já aceita em outras
+regras?
+
+### Impacto técnico:
+Pendente — estender `sql/audiencias_realizadas_v2_draft.sql` com regras 4d (equivalente à 3d) e
+ajustar 4/4b para aceitar diligência+Julgamento sem Encerramento formal.
+
 ---
 
 ## Anexo: Tabela de Referência Rápida
@@ -490,8 +517,9 @@ próxima audiência (hoje exige `pa.id_tipo_audiencia_proxima = ANY(tipo_instruc
 | 10 | Watermark autorreferente — perda silenciosa de audiências | — (mecanismo de carga) | ✅ Resolvida (2026-09-30) — mantido como está, risco aceito | — |
 | 11 | [NOVA 2026-09-28] Mapeamento exato de "Conciliação" | — | ✅ Resolvida (2026-09-30) — só Conciliação em Conhecimento | — |
 | 12 | [NOVA 2026-10-02] UNA resolvida direto, sem nova audiência | — | Aguardando área de negócio | **Alto** (37,7% da população UNA) |
+| 13 | [NOVA 2026-10-02] Instrução sem regra de avanço de categoria (análogo à UNA 3d) | — | Aguardando área de negócio | **Baixo** (54/40.581 = 0,13%) |
 
-**Pendente (aguardando área de negócio):** #12. **Residual de baixo risco (hipótese já implementada):** #2.
+**Pendente (aguardando área de negócio):** #12, #13. **Residual de baixo risco (hipótese já implementada):** #2.
 
 ---
 
